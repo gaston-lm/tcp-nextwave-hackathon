@@ -1,0 +1,2 @@
+country,provider_name,provider_id,method_name,method_id,merchant_name,merchant_id,issuing_bank,receiving_bank,transaction_id,issued_timestamp,is_declined,decline_code,currency,value_transaction_currency,value
+AR,ExamplePay,1,credit_card,1,Example Merchant,1001,Example Issuer,Example Acquirer,900001,2026-08-29T12:30:00,false,0,ARS,12500.50,10.25

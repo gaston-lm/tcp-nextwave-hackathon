@@ -4,3 +4,5 @@ env/
 __pycache__/
 .venv
 venv/
+.env
+ingestion/data/transactions.csv
