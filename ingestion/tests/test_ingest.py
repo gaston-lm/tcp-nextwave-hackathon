@@ -1,8 +1,9 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from ingestion.ingest import IngestionError, read_transactions
+from ingestion.load_history import IngestionError, read_transactions
 from ingestion.stream_ingest import replay_transactions
 
 
@@ -59,3 +60,4 @@ def test_replays_transactions_in_configured_batches(monkeypatch, tmp_path):
 
     assert inserted == 2
     assert [len(batch) for batch in batches] == [1, 1]
+    assert all(item.issued_timestamp.date() == datetime.now(timezone.utc).date() for batch in batches for item in batch)

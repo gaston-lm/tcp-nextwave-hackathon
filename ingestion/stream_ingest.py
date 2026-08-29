@@ -4,18 +4,18 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import logging
 import sys
 import time
 from collections.abc import Callable, Iterable
-from itertools import islice
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from .ingest import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
+    from .load_history import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
 except ImportError:  # Allows `python ingestion/stream_ingest.py ...`.
-    from ingest import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
+    from load_history import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
 
 
 def replay_transactions(
@@ -35,7 +35,7 @@ def replay_transactions(
         if delay > 0:
             time.sleep(delay)
         next_row_at += interval
-        batch.append(transaction)
+        batch.append(replace(transaction, issued_timestamp=datetime.now(timezone.utc).replace(tzinfo=None)))
 
         if len(batch) == batch_size:
             inserted += insert_batch(batch)
@@ -46,40 +46,6 @@ def replay_transactions(
         inserted += insert_batch(batch)
         logging.info("Inserted %d rows so far.", inserted)
     return inserted
-
-
-def count_csv_rows(path: Path) -> int:
-    """Count data rows without loading the CSV into memory."""
-    with path.open(newline="", encoding="utf-8-sig") as csv_file:
-        reader = csv.reader(csv_file)
-        next(reader, None)
-        return sum(1 for _ in reader)
-
-
-def _batches(transactions: Iterable[Transaction], batch_size: int) -> Iterable[list[Transaction]]:
-    iterator = iter(transactions)
-    while batch := list(islice(iterator, batch_size)):
-        yield batch
-
-
-def bootstrap_then_stream(
-    transactions: Iterable[Transaction],
-    total_rows: int,
-    insert_batch: Callable[[list[Transaction]], int],
-    rows_per_second: float,
-    stream_batch_size: int,
-    bootstrap_percent: int = 20,
-    bootstrap_batch_size: int = 1000,
-) -> int:
-    """Bulk-load an initial portion, then replay the remaining rows at a fixed rate."""
-    bootstrap_rows = total_rows * bootstrap_percent // 100
-    iterator = iter(transactions)
-    inserted = 0
-    for batch in _batches(islice(iterator, bootstrap_rows), bootstrap_batch_size):
-        inserted += insert_batch(batch)
-        logging.info("Bootstrap inserted %d of %d rows.", inserted, bootstrap_rows)
-    logging.info("Bootstrap complete. Streaming the remaining %d rows.", total_rows - bootstrap_rows)
-    return inserted + replay_transactions(iterator, rows_per_second, stream_batch_size, insert_batch)
 
 
 def main(argv: list[str] | None = None) -> int:
