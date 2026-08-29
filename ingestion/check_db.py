@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 try:
-    from .ingest import IngestionError, database_config
+    from .load_history import IngestionError, database_config
 except ImportError:  # Allows `python ingestion/check_db.py`.
-    from ingest import IngestionError, database_config
+    from load_history import IngestionError, database_config
 
 
 def main() -> int:

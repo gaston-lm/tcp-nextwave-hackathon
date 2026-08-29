@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load a payment transaction CSV into PostgreSQL."""
+"""Load a historical payment transaction CSV into PostgreSQL."""
 
 from __future__ import annotations
 
@@ -214,8 +214,8 @@ def insert_transactions(connection, transactions: Iterable[Transaction]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Ingest a payment transaction CSV into PostgreSQL.")
-    parser.add_argument("csv_file", type=Path, help="Path to the input CSV file")
+    parser = argparse.ArgumentParser(description="Load a historical payment transaction CSV into PostgreSQL.")
+    parser.add_argument("csv_file", type=Path, help="Path to the history CSV file")
     args = parser.parse_args(argv)
     started = time.monotonic()
     try:
@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             ) from error
         load_dotenv(dotenv_path=Path(__file__).parents[1] / "data" / ".env")
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-        logging.info("Reading %s...", args.csv_file)
+        logging.info("Reading history from %s...", args.csv_file)
         transactions = read_transactions(args.csv_file)
         logging.info("Loaded %d rows. Validation successful.", len(transactions))
 

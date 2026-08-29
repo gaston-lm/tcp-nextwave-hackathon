@@ -1,6 +1,6 @@
 # Payment transaction ingestion
 
-This folder contains the CSV ingestion, simulated streaming, PostgreSQL status, and local Docker database tools.
+This folder contains historical CSV loading, simulated live streaming, and PostgreSQL status tools.
 
 ## Setup
 
@@ -24,31 +24,23 @@ country,provider_name,provider_id,method_name,method_id,merchant_name,merchant_i
 
 The importer upserts provider/method mappings before inserting transactions. Boolean values may be `true`, `false`, `1`, or `0`; timestamps use ISO-8601.
 
-## Bulk ingestion
+## Load history
+
+Load a finite historical CSV while preserving each source `issued_timestamp`:
 
 ```bash
-python ingestion/ingest.py ingestion/data/example.csv
+python ingestion/load_history.py ingestion/data/example.csv
 ```
 
 ## Simulated live stream
 
-Replay a CSV at a controlled rate:
+Replay a CSV at a controlled rate. Before each row is inserted, the loader overwrites its source `issued_timestamp` with the current UTC time so the database behaves like a live feed.
 
 ```bash
 python ingestion/stream_ingest.py ingestion/data/transactions.csv --rows-per-second 10 --batch-size 25
 ```
 
 Stop it with `Ctrl+C` (or `kill <PID>`). Completed batches remain committed.
-
-## Bootstrap then stream
-
-Bulk-load the first 20% of the file in batches of 1,000, then stream the remaining rows:
-
-```bash
-python ingestion/bootstrap_and_stream.py ingestion/data/transactions.csv --rows-per-second 10 --batch-size 25
-```
-
-Transaction inserts are idempotent by `transaction_id`, so this can safely resume after a partial run.
 
 ## Check database status
 
