@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"
             ) from error
 
-        load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+        load_dotenv(dotenv_path=Path(__file__).parents[1] / "data" / ".env")
         logging.info("Streaming and validating %s...", args.csv_file)
         transactions = iter_transactions(args.csv_file)
         logging.info(
