@@ -14,6 +14,7 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:5173",
         "http://localhost:5173",
+        "https://control-tower-tcp10.vercel.app",
         "https://frontend-eta-one-42.vercel.app",
         "https://frontend-bfizk72dq-tcp10.vercel.app",
     ],
