@@ -3,21 +3,21 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './overrides.css'
 
-const fallbackIssues = [
-  { id: 'INC-2048', title: 'Mercado Pago declines transfers from AR', level: 'Urgent', time: 'Since 15:30', volume: '1,284 affected' },
-  { id: 'INC-2047', title: 'Naranja X transfer latency elevated', level: 'High', time: 'Since 10:15', volume: '642 affected' },
-  { id: 'INC-2046', title: 'Brazilian card authorization dip', level: 'Medium', time: 'Since 08:40', volume: '318 affected' },
-]
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+const API_REQUEST_OPTIONS = {
+  headers: { 'ngrok-skip-browser-warning': '1' },
+}
 
 const bars = [22, 68, 56, 31, 48, 19, 27]
 
 function App() {
-  const [issues, setIssues] = useState(fallbackIssues)
-  const [selected, setSelected] = useState(fallbackIssues[0])
+  const [issues, setIssues] = useState([])
+  const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/incidents')
+    fetch(`${API_BASE_URL}/api/incidents`, API_REQUEST_OPTIONS)
       .then(response => response.ok ? response.json() : Promise.reject(response))
       .then(data => {
         const apiIssues = data.map(issue => ({
@@ -31,22 +31,34 @@ function App() {
         if (apiIssues.length) {
           setIssues(apiIssues)
           setSelected(apiIssues[0])
+          setLoadError(null)
+        } else {
+          setLoadError('The API returned no incidents.')
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        setIssues([])
+        setSelected(null)
+        setLoadError('Unable to load incidents from the Control Tower API.')
+      })
   }, [])
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/api/incidents/${selected.id}`)
+    if (!selected) {
+      setDetail(null)
+      return
+    }
+
+    fetch(`${API_BASE_URL}/api/incidents/${selected.id}`, API_REQUEST_OPTIONS)
       .then(response => response.ok ? response.json() : Promise.reject(response))
       .then(setDetail)
       .catch(() => setDetail(null))
-  }, [selected.id])
+  }, [selected?.id])
 
   const action = detail?.agentAction
-  const overview = detail?.overview || selected.overview || 'Authorization declines are 4.6× above the expected baseline.'
-  const estimatedImpact = detail?.estimatedImpact ?? selected.estimatedImpact ?? 5120000
-  const affectedTransactions = detail?.affectedTransactions ?? selected.affectedTransactions ?? 1284
+  const overview = detail?.overview || selected?.overview || 'No overview returned by the API.'
+  const estimatedImpact = detail?.estimatedImpact ?? selected?.estimatedImpact
+  const affectedTransactions = detail?.affectedTransactions ?? selected?.affectedTransactions
 
   return <main className="shell">
     <header>
@@ -79,20 +91,20 @@ function App() {
     <section className="workspace">
       <aside className="issue-list panel">
         <div className="panel-heading"><div><p className="eyebrow">ISSUES FOUND</p><h2>Prioritized queue</h2></div><span className="count">{issues.length}</span></div>
-        <div className="issues">{issues.map(issue => <button className={`issue ${selected.id === issue.id ? 'selected' : ''}`} key={issue.id} onClick={() => setSelected(issue)}>
+        <div className="issues">{issues.length ? issues.map(issue => <button className={`issue ${selected?.id === issue.id ? 'selected' : ''}`} key={issue.id} onClick={() => setSelected(issue)}>
           <div><span className={`badge ${issue.level.toLowerCase()}`}>{issue.level}</span><span className="issue-id">{issue.id}</span></div>
           <strong>{issue.title}</strong><small>{issue.time} · {issue.volume}</small>
-        </button>)}</div>
+        </button>) : <p>{loadError || 'Loading incidents from the API…'}</p>}</div>
       </aside>
 
-      <article className="detail panel">
+      <article className="detail panel">{selected ? <>
         <div className="detail-top"><div><p className="eyebrow">ISSUE {selected.id}</p><h2>{selected.title}</h2></div></div>
         <div className="meta"><span className="badge urgent">{selected.level}</span><span>{selected.time}</span><span>Last seen just now</span></div>
         <div className="divider" />
-        <div className="facts"><div><span>Estimated impact</span><strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{detail?.approvalRateDrop ?? 18.7}%</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions.toLocaleString()}</strong></div></div>
+        <div className="facts"><div><span>Estimated impact</span><strong>{estimatedImpact == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{detail?.approvalRateDrop == null ? '—' : `${detail.approvalRateDrop}%`}</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions == null ? '—' : affectedTransactions.toLocaleString()}</strong></div></div>
         <section className="next overview-card"><p className="eyebrow">OVERVIEW</p><h3>{overview}</h3><p>Issue data and its operational state are loaded from the Control Tower API.</p></section>
         <section className="insight actions-taken"><p className="eyebrow">AGENT ACTIONS TAKEN</p><h3>{action || 'No agent actions recorded yet.'}</h3><p>{action ? 'The action has been recorded and the incident remains under active observation.' : 'The API has not returned an action for this incident.'}</p></section>
-      </article>
+      </> : <div className="detail-top"><div><p className="eyebrow">API STATUS</p><h2>{loadError ? 'Unable to load incidents' : 'Loading incidents…'}</h2><p>{loadError || 'Waiting for the Control Tower API response.'}</p></div></div>}</article>
     </section>
   </main>
 }
