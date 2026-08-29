@@ -226,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
             raise IngestionError(
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"
             ) from error
-        load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+        load_dotenv(dotenv_path=Path(__file__).parents[1] / "data" / ".env")
         logging.basicConfig(level=logging.INFO, format="%(message)s")
         logging.info("Reading %s...", args.csv_file)
         transactions = read_transactions(args.csv_file)

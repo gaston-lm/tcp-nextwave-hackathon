@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from dotenv import load_dotenv
         import psycopg2
-        load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+        load_dotenv(dotenv_path=Path(__file__).parents[1] / "data" / ".env")
         total_rows = count_csv_rows(args.csv_file)
         logging.info("Bootstrapping %d of %d rows (20%%).", total_rows // 5, total_rows)
         with psycopg2.connect(**database_config()) as connection:

@@ -22,7 +22,7 @@ def main() -> int:
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"
             ) from error
 
-        load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
+        load_dotenv(dotenv_path=Path(__file__).parents[1] / "data" / ".env")
         with psycopg2.connect(**database_config()) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("""

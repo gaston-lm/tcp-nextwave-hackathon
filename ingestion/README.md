@@ -10,25 +10,9 @@ Create and activate a virtual environment, then install dependencies:
 python -m venv .venv
 source .venv/bin/activate
 pip install -r ingestion/requirements.txt
-cp ingestion/.env.example ingestion/.env
 ```
 
-Set a non-empty local password in `ingestion/.env` before starting PostgreSQL. This file is ignored by Git and must never be committed.
-
-## Local PostgreSQL with Docker
-
-Start PostgreSQL and initialize it with the team-provided schema plus mappings for the example CSV:
-
-```bash
-docker compose -f ingestion/docker-compose.yml up -d
-```
-
-The SQL definitions run only when Docker creates a fresh database volume. To reset the local database entirely:
-
-```bash
-docker compose -f ingestion/docker-compose.yml down -v
-docker compose -f ingestion/docker-compose.yml up -d
-```
+See [the shared database README](../data/README.md) to configure and start PostgreSQL.
 
 ## CSV format
 

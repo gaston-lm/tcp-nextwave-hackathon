@@ -1,0 +1,40 @@
+header { justify-content: initial; }
+
+.action-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: #087a80;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.action-status span {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #dff7f7;
+  color: #00868c;
+  font-size: 12px;
+}
+
+.overview-card {
+  margin-bottom: 24px;
+}
+
+.overview-card h3,
+.actions-taken h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.actions-taken {
+  border-left-color: #d81787;
+}
+
+.actions-taken h3 {
+  font-size: 21px;
+}
