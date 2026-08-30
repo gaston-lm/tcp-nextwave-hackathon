@@ -38,3 +38,44 @@ header { justify-content: initial; }
 .actions-taken h3 {
   font-size: 21px;
 }
+
+.incident-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.incident-tab {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.incident-tab:hover {
+  background: #fff0f8;
+  border-color: #df65ae;
+  color: #a50061;
+}
+
+.incident-tab.active {
+  background: #d81787;
+  border-color: #d81787;
+  color: #fff;
+}
+
+.incident-tab.active:hover {
+  background: #b70f70;
+  border-color: #b70f70;
+  color: #fff;
+}
+
+.incident-read-action {
+  background: #d81787;
+  border-color: #d81787;
+  color: #fff;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.incident-read-action:hover {
+  background: #b70f70;
+  border-color: #b70f70;
+  color: #fff;
+}

@@ -49,3 +49,7 @@ ON CONFLICT (incident_key) DO UPDATE SET
     agent_action_at = EXCLUDED.agent_action_at,
     started_at = EXCLUDED.started_at,
     last_seen_at = EXCLUDED.last_seen_at;
+
+UPDATE incidents
+SET is_read = incident_key IN ('HIGH-3158', 'MED-3157', 'LOW-3156', 'HIGH-3155', 'MED-3154')
+WHERE incident_key IN ('URG-3159', 'HIGH-3160', 'MED-3161', 'HIGH-3158', 'MED-3157', 'LOW-3156', 'HIGH-3155', 'MED-3154');

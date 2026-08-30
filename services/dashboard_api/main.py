@@ -16,7 +16,7 @@ app.add_middleware(
         "https://frontend-eta-one-42.vercel.app",
         "https://frontend-bfizk72dq-tcp10.vercel.app",
     ],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -38,6 +38,10 @@ class IncidentCreate(BaseModel):
     estimated_impact: float | None = None
 
 
+class IncidentReadUpdate(BaseModel):
+    is_read: bool
+
+
 def serialize_incident(row):
     return {
         "key": row[0],
@@ -54,6 +58,7 @@ def serialize_incident(row):
         "agentActionAt": row[11],
         "startedAt": row[12],
         "lastSeenAt": row[13],
+        "isRead": row[14],
     }
 
 
@@ -70,7 +75,7 @@ def list_incidents():
         db_cursor.execute("""
             SELECT incident_key, title, severity, status, country, provider_name, overview,
                    estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                   started_at, last_seen_at
+                   started_at, last_seen_at, is_read
             FROM incidents ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
         """)
         return [serialize_incident(row) for row in db_cursor.fetchall()]
@@ -80,21 +85,17 @@ def list_incidents():
 def incidents_today():
     with cursor() as db_cursor:
         db_cursor.execute("""
-            SELECT severity, COUNT(*)
+            SELECT incident_key, severity
             FROM incidents
             WHERE started_at >= date_trunc('day', CURRENT_TIMESTAMP)
               AND started_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
-            GROUP BY severity
-            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END
+            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, incident_key
         """)
-        by_severity = [
-            {"severity": severity, "count": count}
-            for severity, count in db_cursor.fetchall()
+        by_incident_key = [
+            {"incidentKey": incident_key, "severity": severity, "count": 1}
+            for incident_key, severity in db_cursor.fetchall()
         ]
-    return {
-        "total": sum(item["count"] for item in by_severity),
-        "bySeverity": by_severity,
-    }
+    return {"total": len(by_incident_key), "byIncidentKey": by_incident_key}
 
 
 @app.get("/api/dashboard/incidents-this-week")
@@ -130,11 +131,28 @@ def get_incident(incident_key: str):
             """
             SELECT incident_key, title, severity, status, country, provider_name, overview,
                    estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                   started_at, last_seen_at
+                   started_at, last_seen_at, is_read
             FROM incidents WHERE incident_key = %s
         """,
             (incident_key,),
         )
+        incident = db_cursor.fetchone()
+        if incident is None:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        return serialize_incident(incident)
+
+
+@app.patch("/api/incidents/{incident_key}/read")
+def update_incident_read_status(incident_key: str, update: IncidentReadUpdate):
+    with cursor() as db_cursor:
+        db_cursor.execute("""
+            UPDATE incidents
+            SET is_read = %s
+            WHERE incident_key = %s
+            RETURNING incident_key, title, severity, status, country, provider_name, overview,
+                      estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
+                      started_at, last_seen_at, is_read
+        """, (update.is_read, incident_key))
         incident = db_cursor.fetchone()
         if incident is None:
             raise HTTPException(status_code=404, detail="Incident not found")

@@ -15,6 +15,25 @@ const severityColors = {
   low: 'gray',
 }
 
+const severityHexColors = {
+  urgent: '#db1686',
+  high: '#00bfc6',
+  medium: '#915ee9',
+  low: '#c9c9d0',
+}
+
+function incidentRingGradient(incidents, total) {
+  if (!total) return '#e2e2e7'
+
+  let position = 0
+  const segments = incidents.map(({ severity, count }) => {
+    const start = position
+    position += (count / total) * 100
+    return `${severityHexColors[severity]} ${start}% ${position}%`
+  })
+  return `conic-gradient(${segments.join(', ')})`
+}
+
 function App() {
   const [issues, setIssues] = useState([])
   const [selected, setSelected] = useState(null)
@@ -22,7 +41,7 @@ function App() {
   const [loadError, setLoadError] = useState(null)
   const [todayMetrics, setTodayMetrics] = useState(null)
   const [weeklyMetrics, setWeeklyMetrics] = useState(null)
-  const [showAllIncidents, setShowAllIncidents] = useState(false)
+  const [activeIncidentTab, setActiveIncidentTab] = useState('unread')
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/incidents`, API_REQUEST_OPTIONS)
@@ -86,10 +105,39 @@ function App() {
   const affectedTransactions = detail?.affectedTransactions ?? selected?.affectedTransactions
   const weekDays = weeklyMetrics?.days || []
   const maxWeeklyCount = Math.max(...weekDays.map(day => day.count), 1)
-  const today = new Date().toDateString()
-  const visibleIncidents = showAllIncidents
-    ? issues
-    : issues.filter(incident => new Date(incident.startedAt).toDateString() === today)
+  const unreadIncidents = issues.filter(incident => !incident.isRead)
+  const readIncidents = issues.filter(incident => incident.isRead)
+  const tabIncidents = activeIncidentTab === 'unread' ? unreadIncidents : readIncidents
+  const todayIncidentKeys = todayMetrics?.byIncidentKey || []
+  const ringGradient = incidentRingGradient(todayIncidentKeys, todayMetrics?.total || 0)
+
+  const setIncidentReadStatus = () => {
+    if (!selected) return
+
+    const isRead = !selected.isRead
+    fetch(`${API_BASE_URL}/api/incidents/${selected.id}/read`, {
+      ...API_REQUEST_OPTIONS,
+      method: 'PATCH',
+      headers: { ...API_REQUEST_OPTIONS.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_read: isRead }),
+    })
+      .then(response => response.ok ? response.json() : Promise.reject(response))
+      .then(updated => {
+        const updatedIncident = {
+          id: updated.key,
+          title: updated.title,
+          level: updated.severity[0].toUpperCase() + updated.severity.slice(1),
+          time: `Since ${new Date(updated.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          volume: `${updated.affectedTransactions.toLocaleString()} affected`,
+          ...updated,
+        }
+        setIssues(current => current.map(incident => incident.id === updatedIncident.id ? updatedIncident : incident))
+        setSelected(updatedIncident)
+        setDetail(updated)
+        setActiveIncidentTab(isRead ? 'read' : 'unread')
+      })
+      .catch(() => setLoadError('Unable to update the incident read status.'))
+  }
 
   return <main className="shell">
     <header>
@@ -103,8 +151,8 @@ function App() {
       <article className="panel anomalies">
         <div className="panel-heading"><div><p className="eyebrow">TODAY</p><h2>Incidents found</h2></div></div>
         <div className="anomaly-content">
-          <div className="ring"><div><strong>{todayMetrics?.total ?? '—'}</strong><span>detected</span></div></div>
-          <ul className="legend">{todayMetrics ? todayMetrics.bySeverity.length ? todayMetrics.bySeverity.map(({ severity, count }) => <li key={severity}><i className={`dot ${severityColors[severity]}`} /> {severity} <b>{count}</b></li>) : <li>No incidents detected today.</li> : <li>Loading incident metrics…</li>}</ul>
+          <div className="ring" style={{ background: ringGradient }}><div><strong>{todayMetrics?.total ?? '—'}</strong><span>detected</span></div></div>
+          <ul className="legend">{todayMetrics ? todayIncidentKeys.length ? todayIncidentKeys.map(({ incidentKey, severity }) => <li key={incidentKey}><i className={`dot ${severityColors[severity]}`} /> {incidentKey} <b>{severity}</b></li>) : <li>No incidents detected today.</li> : <li>Loading incident metrics…</li>}</ul>
         </div>
       </article>
 
@@ -116,15 +164,16 @@ function App() {
 
     <section className="workspace">
       <aside className="issue-list panel">
-        <div className="panel-heading"><div><p className="eyebrow">INCIDENTS FOUND</p><h2>{showAllIncidents ? 'All incidents' : 'Today’s incidents'}</h2></div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><button className="quiet" onClick={() => setShowAllIncidents(showAll => !showAll)}>{showAllIncidents ? 'Show today' : `Show all (${issues.length})`}</button><span className="count">{visibleIncidents.length}</span></div></div>
-        <div className="issues">{visibleIncidents.length ? visibleIncidents.map(issue => <button className={`issue ${selected?.id === issue.id ? 'selected' : ''}`} key={issue.id} onClick={() => setSelected(issue)}>
+        <div className="panel-heading"><div><p className="eyebrow">INCIDENTS FOUND</p><h2>All incidents</h2></div></div>
+        <div className="incident-tabs"><button className={`quiet incident-tab ${activeIncidentTab === 'unread' ? 'active' : ''}`} onClick={() => setActiveIncidentTab('unread')}>Unread ({unreadIncidents.length})</button><button className={`quiet incident-tab ${activeIncidentTab === 'read' ? 'active' : ''}`} onClick={() => setActiveIncidentTab('read')}>Read ({readIncidents.length})</button></div>
+        <div className="issues">{tabIncidents.length ? tabIncidents.map(issue => <button className={`issue ${selected?.id === issue.id ? 'selected' : ''}`} key={issue.id} onClick={() => setSelected(issue)}>
           <div><span className={`badge ${issue.level.toLowerCase()}`}>{issue.level}</span><span className="issue-id">{issue.id}</span></div>
           <strong>{issue.title}</strong><small>{issue.time} · {issue.volume}</small>
-        </button>) : <p>{loadError || 'No incidents detected today.'}</p>}</div>
+        </button>) : <p>{loadError || `No ${activeIncidentTab} incidents detected today.`}</p>}</div>
       </aside>
 
       <article className="detail panel">{selected ? <>
-        <div className="detail-top"><div><p className="eyebrow">INCIDENT {selected.id}</p><h2>{selected.title}</h2></div></div>
+        <div className="detail-top"><div><p className="eyebrow">INCIDENT {selected.id}</p><h2>{selected.title}</h2></div><button className="quiet incident-read-action" onClick={setIncidentReadStatus}>{selected.isRead ? 'Mark as unread' : 'Mark as read'}</button></div>
         <div className="meta"><span className="badge urgent">{selected.level}</span><span>{selected.time}</span><span>Last seen just now</span></div>
         <div className="divider" />
         <div className="facts"><div><span>Estimated impact</span><strong>{estimatedImpact == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{detail?.approvalRateDrop == null ? '—' : `${detail.approvalRateDrop}%`}</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions == null ? '—' : affectedTransactions.toLocaleString()}</strong></div></div>
