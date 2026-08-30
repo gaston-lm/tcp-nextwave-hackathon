@@ -20,19 +20,7 @@ def request_json(url: str, payload: dict[str, Any] | None = None) -> dict[str, A
         return json.loads(response.read())
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Run an agent investigation for the Generator's current simulated time."
-    )
-    parser.add_argument("--agent-url", default="http://127.0.0.1:8001")
-    parser.add_argument("--generator-url", default="http://127.0.0.1:8002")
-    parser.add_argument(
-        "--lock-file",
-        type=Path,
-        default=Path("/tmp/control-tower-agent-scheduler.lock"),
-    )
-    args = parser.parse_args()
-
+def run_once(args: argparse.Namespace) -> int:
     args.lock_file.parent.mkdir(parents=True, exist_ok=True)
     with args.lock_file.open("w", encoding="utf-8") as lock_file:
         try:
@@ -69,6 +57,21 @@ def main() -> int:
         f"updated={persistence.get('updated_incident_ids', [])}."
     )
     return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Run an agent investigation for the Generator's current simulated time."
+    )
+    parser.add_argument("--agent-url", default="http://127.0.0.1:8001")
+    parser.add_argument("--generator-url", default="http://127.0.0.1:8002")
+    parser.add_argument(
+        "--lock-file",
+        type=Path,
+        default=Path("/tmp/control-tower-agent-scheduler.lock"),
+    )
+    args = parser.parse_args()
+    return run_once(args)
 
 
 if __name__ == "__main__":

@@ -67,8 +67,8 @@
     <p class="intro">Start the accelerated payment feed, then activate a preselected incident scenario when you want the failed-transactions chart to react.</p>
 
     <section class="card">
-      <div class="card-head"><div><h2>Live stream</h2><p>One real second represents one simulated minute.</p></div></div>
-      <div class="live-volume"><div class="field"><label for="live-rows">Transactions / simulated minute</label><input id="live-rows" type="number" min="1" step="1"></div><p class="note">Average per real second</p></div>
+      <div class="card-head"><div><h2>Live stream</h2><p>One real second writes one second of transaction timestamps.</p></div></div>
+      <div class="live-volume"><div class="field"><label for="live-rows">Transactions / minute</label><input id="live-rows" type="number" min="1" step="1"></div><p class="note">Inserted continuously across the minute</p></div>
       <div class="actions"><button id="start-live" type="button">Start live streaming</button><button id="stop-live" type="button">Stop live streaming</button></div>
       <span id="status">Loading stream status…</span>
     </section>
@@ -86,15 +86,12 @@
         <div><h2>Break BancoEstado in Chile</h2><p>Raises declines for BancoEstado transactions in Chile only.</p></div>
         <label class="switch" title="Toggle BancoEstado Chile failure spike"><input id="bancoestado-spike" type="checkbox" role="switch" aria-label="Enable BancoEstado Chile failure spike"><span class="slider"></span></label>
       </div>
-      <p class="note">Only one scenario can be active at a time. Changes apply from the next simulated minute.</p>
+      <p class="note">Only one scenario can be active at a time. Changes apply from the next second.</p>
     </section>
 
     <details>
       <summary>Advanced settings</summary>
-      <p class="advanced-copy">Edit the live generator profile directly. These settings are applied from the next simulated minute and replace any active preset.</p>
-      <div class="advanced-grid">
-        <div class="field"><label for="simulated-start">Simulated start</label><input id="simulated-start" type="datetime-local" step="60"></div>
-      </div>
+      <p class="advanced-copy">Edit the live generator profile directly. These settings are applied from the next second and replace any active preset.</p>
       <div id="provider-rates" class="provider-rates"></div>
       <form id="rule-form" class="rule-form">
         <div class="field"><label>Provider</label><select name="provider" required></select></div>
@@ -119,7 +116,6 @@
     const bancoEstadoToggle = document.querySelector('#bancoestado-spike');
     const status = document.querySelector('#status');
     const liveRowsInput = document.querySelector('#live-rows');
-    const simulatedStartInput = document.querySelector('#simulated-start');
     const providerRatesContainer = document.querySelector('#provider-rates');
     const ruleForm = document.querySelector('#rule-form');
     const ruleList = document.querySelector('#rule-list');
@@ -141,8 +137,8 @@
       mercadoPagoToggle.checked = stream.scenario === 'mercadopago_spike';
       bancoEstadoToggle.checked = stream.scenario === 'chile_bancoestado_spike';
       if (stream.last_error) return setStatus(`Stream stopped: ${stream.last_error}`, 'error');
-      if (stream.stopping) return setStatus('Stopping after the current simulated minute…');
-      if (stream.running) return setStatus(`Running · ${stream.inserted_rows.toLocaleString('en-US')} transactions inserted · next simulated minute: ${stream.simulated_timestamp}`, 'running');
+      if (stream.stopping) return setStatus('Stopping after the current second…');
+      if (stream.running) return setStatus(`Running · ${stream.inserted_rows.toLocaleString('en-US')} transactions inserted · next timestamp: ${stream.simulated_timestamp}`, 'running');
       setStatus(stream.generated_rows ? `Stopped · ${stream.inserted_rows.toLocaleString('en-US')} transactions inserted` : 'Stopped');
     }
     async function request(path, payload) {
@@ -157,7 +153,7 @@
         const rowsPerMinute = Number(liveRowsInput.value);
         if (!Number.isInteger(rowsPerMinute) || rowsPerMinute < 1 || rowsPerMinute > config.max_live_rows_per_minute) throw new Error(`Transactions per minute must be between 1 and ${config.max_live_rows_per_minute.toLocaleString('en-US')}.`);
         startButton.disabled = true;
-        await request('/api/live/start', { rows_per_minute: rowsPerMinute, start_at: simulatedStartInput.value, provider_rates: collectProviderRates(), rules });
+        await request('/api/live/start', { rows_per_minute: rowsPerMinute, provider_rates: collectProviderRates(), rules });
       }
       catch (error) { setStatus(error.message, 'error'); startButton.disabled = false; }
     }
@@ -223,7 +219,7 @@
       try {
         if (!stream?.running) throw new Error('Start live streaming before applying advanced settings.');
         await request('/api/live/config', { provider_rates: collectProviderRates(), rules, scenario: 'normal' });
-        setStatus('Advanced settings will apply from the next simulated minute.', 'running');
+        setStatus('Advanced settings will apply from the next second.', 'running');
       } catch (error) { setStatus(error.message, 'error'); }
     });
     Promise.all([fetch('/api/config').then(response => response.json()), fetch('/api/live/status').then(response => response.json())])
@@ -231,7 +227,6 @@
         config = nextConfig;
         liveRowsInput.value = config.live_rows_per_minute;
         liveRowsInput.max = config.max_live_rows_per_minute;
-        simulatedStartInput.value = config.live_start_at.replace(' ', 'T').slice(0, 16);
         renderProviderRates();
         const countries = Object.keys(config.providers.flatMap(provider => Object.keys(provider.countries)).reduce((all, country) => ({...all, [country]: true}), {}));
         const merchants = [...new Set(config.providers.flatMap(provider => Object.values(provider.countries).flatMap(country => country.merchants)))].sort();

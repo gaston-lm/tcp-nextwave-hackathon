@@ -40,11 +40,10 @@ class MetricsService:
         # for submitting a timestamp in the database's business time zone.
         business_reference = reference.replace(tzinfo=None)
         self.window_end = business_reference.replace(
-            minute=business_reference.minute - (business_reference.minute % 5),
             second=0,
             microsecond=0,
         )
-        self.window_start = self.window_end - timedelta(minutes=5)
+        self.window_start = self.window_end - timedelta(minutes=1)
         self.observation_window_start = self.window_start.replace(
             tzinfo=reference.tzinfo
         )

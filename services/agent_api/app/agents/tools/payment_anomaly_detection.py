@@ -28,7 +28,7 @@ PAYMENT_ANOMALY_DETECTION_TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_current_window_overview",
-        "description": "Get overall acceptance metrics for the latest completed five-minute window and its stored weekday baseline. Call this first.",
+        "description": "Get overall acceptance metrics for the latest completed one-minute window and its stored weekday baseline. Call this first.",
         "parameters": {
             "type": "object",
             "properties": {},
@@ -39,7 +39,7 @@ PAYMENT_ANOMALY_DETECTION_TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_current_segment_metrics",
-        "description": "Compare the latest completed five-minute window to stored weekday baselines. First scan one dimension at a time with no filters. Only then make a combined-dimension query, retaining a filter supported by a prior result and adding one dimension at a time.",
+        "description": "Compare the latest completed one-minute window to stored weekday baselines. First scan one dimension at a time with no filters. Only then make a combined-dimension query, retaining a filter supported by a prior result and adding one dimension at a time.",
         "parameters": {
             "type": "object",
             "properties": {

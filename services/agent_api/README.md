@@ -1,7 +1,7 @@
 # Agent API
 
 FastAPI service implementing the Control Tower investigation orchestration. Its first specialist,
-`AnomalyDetector`, compares a current five-minute window with weekday baseline metrics. Its
+`AnomalyDetector`, compares a current one-minute window with weekday baseline metrics. Its
 validated output is passed to `IncidentReviewer`, which returns proposals for new or updated
 incidents. Both stages use strict JSON Schema Structured Outputs and can only call typed tools;
 they cannot issue SQL directly.
@@ -10,7 +10,7 @@ they cannot issue SQL directly.
 
 ```mermaid
 flowchart TD
-    Request[POST /investigations] --> Metrics[MetricsService\nlatest five-minute window]
+    Request[POST /investigations] --> Metrics[MetricsService\nlatest one-minute window]
     Metrics --> Detector[AnomalyDetector\nstrict JSON Schema output]
     Detector --> Recent[SQLAlchemy repository\nall open incidents]
     Recent --> Reviewer[IncidentReviewer\nstrict JSON Schema output]
@@ -50,7 +50,7 @@ keeping port `8000` available for the dashboard API.
 The SQLAlchemy incident repository validates pooled database connections before checkout, so
 connections made stale by a local PostgreSQL restart are transparently recreated.
 
-Run payment anomaly detection. It analyzes the latest *completed* five-minute bucket;
+Run payment anomaly detection. It analyzes the latest *completed* one-minute bucket;
 pass `as_of` to make a demo or test use a specific point in time. The API resolves this to a
 canonical `[started_at, last_seen_at)` window and supplies it to both agents. New incidents use
 the window start as `started_at`; all proposals use its end as `last_seen_at`; updates preserve
@@ -92,8 +92,10 @@ with the clone path:
 * * * * * cd /absolute/path/to/repo && .venv/bin/python scripts/agent/run_scheduled_investigation.py >> /tmp/control-tower-agent-scheduler.log 2>&1
 ```
 
-Inspect its output with `tail -f /tmp/control-tower-agent-scheduler.log`. Remove
-the cron entry after the demo to stop scheduled OpenAI calls.
+The scheduler uses the Generator's current timestamp, so each run analyzes the
+latest completed one-minute window. Inspect its output with
+`tail -f /tmp/control-tower-agent-scheduler.log`. It skips a tick when the stream
+is stopped or an earlier investigation still holds the lock.
 
 ## Arize AX tracing
 

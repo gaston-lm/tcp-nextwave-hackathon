@@ -51,23 +51,22 @@ def validate_rows_per_minute(value: object) -> int:
     return rows
 
 
-def transactions_for_minute(
-    minute: datetime,
+def transactions_for_second(
+    second: datetime,
     rows: int,
     transaction_id_start: int,
     seed: int,
     provider_rates: dict[str, float],
     decline_rules: list[dict],
 ) -> list[Transaction]:
-    """Build a minute's rows, with event timestamps inside that exact minute."""
-    end = minute + timedelta(seconds=59)
+    """Build a second's rows, with event timestamps inside that exact second."""
     generated = generate_transactions(
         n=rows,
         seed=seed,
         provider_rates=provider_rates,
         decline_rules=decline_rules,
-        start_date=minute,
-        end_date=end,
+        start_date=second,
+        end_date=second,
     )
     return [
         Transaction(
@@ -81,8 +80,9 @@ def transactions_for_minute(
     ]
 
 
-def sample_rows_per_minute(rng: random.Random, average_rows: int) -> int:
-    """Sample a positive minute volume around the configured average."""
+def sample_rows_per_second(rng: random.Random, average_rows_per_minute: int) -> int:
+    """Sample one second of volume while preserving the configured minute average."""
+    average_rows = average_rows_per_minute / 60
     standard_deviation = max(1, average_rows * VOLUME_STANDARD_DEVIATION_RATIO)
     return max(1, round(rng.gauss(average_rows, standard_deviation)))
 
@@ -94,7 +94,7 @@ def sample_hourly_average(rng: random.Random, average_rows: int) -> int:
 
 
 class LiveStreamController:
-    """Owns a stream clock where one real second equals one simulated minute."""
+    """Owns a stream clock where one real second equals one persisted second."""
 
     def __init__(
         self,
@@ -141,13 +141,14 @@ class LiveStreamController:
     def start(
         self,
         rows_per_minute: int,
-        start_at: datetime,
+        start_at: datetime | None,
         provider_rates: dict[str, float] | None,
         decline_rules: list[dict] | None,
     ) -> dict:
         rows_per_minute = validate_rows_per_minute(rows_per_minute)
         rates = validate_provider_rates(provider_rates)
         rules = validate_decline_rules(decline_rules, rates)
+        start_at = self.next_start_at() if start_at is None else start_at
         start_at = start_at.replace(second=0, microsecond=0)
 
         with self._lock:
@@ -172,13 +173,29 @@ class LiveStreamController:
             self._thread.start()
             return self.status()
 
+    def next_start_at(self) -> datetime:
+        """Return the first whole simulated second after persisted transactions."""
+        connection = self._connect_database()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COALESCE(
+                        date_trunc('second', MAX(issued_timestamp)) + INTERVAL '1 second',
+                        date_trunc('second', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+                    )
+                    FROM transactions
+                """)
+                return cursor.fetchone()[0].replace(tzinfo=None)
+        finally:
+            connection.close()
+
     def update_configuration(
         self,
         provider_rates: dict[str, float] | None,
         decline_rules: list[dict] | None,
         scenario: str = "normal",
     ) -> dict:
-        """Apply a new generation configuration at the next simulated minute."""
+        """Apply a new generation configuration at the next simulated second."""
         rates = validate_provider_rates(provider_rates)
         rules = validate_decline_rules(decline_rules, rates)
         with self._lock:
@@ -225,8 +242,8 @@ class LiveStreamController:
                     hourly_average_rows = sample_hourly_average(
                         volume_rng, rows_per_minute
                     )
-                batch_rows = sample_rows_per_minute(volume_rng, hourly_average_rows)
-                rows = transactions_for_minute(
+                batch_rows = sample_rows_per_second(volume_rng, hourly_average_rows)
+                rows = transactions_for_second(
                     clock,
                     batch_rows,
                     next_transaction_id,
@@ -237,7 +254,7 @@ class LiveStreamController:
                 inserted = self._insert_batch(connection, rows)
                 next_transaction_id += len(rows)
                 batch_number += 1
-                clock += timedelta(minutes=1)
+                clock += timedelta(seconds=1)
                 with self._lock:
                     self._state.update(
                         {
@@ -249,7 +266,7 @@ class LiveStreamController:
                             "inserted_rows": self._state["inserted_rows"] + inserted,
                         }
                     )
-                # Do not catch up by emitting multiple simulated minutes at once if
+                # Do not catch up by emitting multiple persisted seconds at once if
                 # generation or the database is slower than a second.
                 stop_event.wait(max(0, 1 - (time.monotonic() - batch_started)))
         except Exception as error:

@@ -32,6 +32,46 @@ make agent-api      # http://127.0.0.1:8001
 make dashboard      # Vite development server
 ```
 
+## Recreate the local demo environment
+
+The full historical baseline is local-only and intentionally ignored by Git.
+Place it at `data/local/baseline.csv` before initialization. The current demo
+baseline contains one million historical transactions.
+
+To recreate the database from scratch, including the schema, seeded dashboard
+incidents, and weekday baseline metrics:
+
+```bash
+docker compose -f data/docker-compose.yml down -v
+make db-up
+make db-init HISTORY=data/local/baseline.csv
+```
+
+Start each local service in its own terminal:
+
+```bash
+make dashboard-api          # http://127.0.0.1:8000
+make agent-api              # http://127.0.0.1:8001
+make dashboard              # http://127.0.0.1:5173
+make ingestion-generator    # http://127.0.0.1:8002
+```
+
+The Generator continues from one second after the newest stored transaction
+timestamp. It produces one second of timestamps per real second while keeping
+the configured transaction average per minute. The agent analyzes the latest
+completed one-minute window. To run it once per minute during the demo, add the
+following entry with `crontab -e`, replacing the repository path:
+
+```cron
+* * * * * cd /absolute/path/to/repo && .venv/bin/python scripts/agent/run_scheduled_investigation.py >> /tmp/control-tower-agent-scheduler.log 2>&1
+```
+
+The job safely skips when the Generator is stopped. Follow its output with:
+
+```bash
+tail -f /tmp/control-tower-agent-scheduler.log
+```
+
 ## Repository layout
 
 ```text
@@ -60,7 +100,7 @@ make dashboard      # Vite development server
 
 The agent API runs a three-stage incident workflow:
 
-1. `AnomalyDetector` analyzes the latest completed five-minute payment window and returns a
+1. `AnomalyDetector` analyzes the latest completed one-minute payment window and returns a
    strict JSON Schema result.
 2. `IncidentReviewer` compares that result with all open incidents and
    uses semantic searches over closed-incident memory and payment deployment logs.

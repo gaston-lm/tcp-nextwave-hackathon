@@ -1,20 +1,20 @@
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from scripts.ingestion.generator.live_stream import (
     LiveStreamController,
-    transactions_for_minute,
+    transactions_for_second,
     validate_rows_per_minute,
 )
 
 
-def test_live_minute_keeps_timestamps_within_its_simulated_minute():
-    minute = datetime(2026, 8, 30, 12, 34)
+def test_live_second_keeps_timestamps_within_its_persisted_second():
+    second = datetime(2026, 8, 30, 12, 34, 45)
 
-    transactions = transactions_for_minute(
-        minute=minute,
+    transactions = transactions_for_second(
+        second=second,
         rows=5,
         transaction_id_start=900,
         seed=42,
@@ -25,10 +25,7 @@ def test_live_minute_keeps_timestamps_within_its_simulated_minute():
     assert [transaction.transaction_id for transaction in transactions] == list(
         range(900, 905)
     )
-    assert all(
-        minute <= transaction.issued_timestamp <= minute.replace(second=59)
-        for transaction in transactions
-    )
+    assert all(transaction.issued_timestamp == second for transaction in transactions)
 
 
 @pytest.mark.parametrize("value", [0, -1, 10_001, "1.5", True])
@@ -37,7 +34,35 @@ def test_live_rows_per_minute_requires_a_positive_integer_in_range(value):
         validate_rows_per_minute(value)
 
 
-def test_controller_generates_and_inserts_the_first_simulated_minute():
+def test_controller_resumes_after_the_latest_persisted_second():
+    latest = datetime(2026, 8, 30, 12, 34, 45, tzinfo=UTC)
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, _):
+            pass
+
+        def fetchone(self):
+            return (latest.replace(microsecond=0) + timedelta(seconds=1),)
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+        def close(self):
+            pass
+
+    controller = LiveStreamController(connect_database=Connection)
+
+    assert controller.next_start_at() == datetime(2026, 8, 30, 12, 34, 46)
+
+
+def test_controller_generates_and_inserts_the_first_persisted_second():
     inserted_batches = []
 
     class Cursor:
