@@ -17,6 +17,12 @@ make dashboard-api
 
 Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
+## Browser access
+
+The API permits the local Vite dashboard and Control Tower's Vercel production
+domain, including Vercel's unique production deployment URLs. This lets the
+deployed dashboard call a temporary public API tunnel during the demo.
+
 ## Endpoints
 
 - `GET /health`
