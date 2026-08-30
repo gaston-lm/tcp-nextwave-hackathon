@@ -1,44 +1,74 @@
-# Generador de transacciones
+# Transaction generator
 
-Todos los archivos necesarios para ejecutar el generador están bajo `scripts/ingestion/`, junto al flujo que alimentan.
+All files needed to run the generator live under `scripts/ingestion/`, alongside the
+ingestion flow that they feed.
 
-Los parámetros editables están centralizados en [`generation_config.py`](generation_config.py): tasas y offsets de rechazo, distribución de códigos ISO-8583, comercios, países, proveedores, métodos, bancos, gasto, volumen horario, fechas, semilla y cantidad de filas. Las probabilidades usan decimales (`0.17` equivale a `17%`) y los valores `weight` son pesos relativos.
+Editable parameters are centralized in [`generation_config.py`](generation_config.py): decline
+rates and offsets, ISO-8583 code distribution, merchants, countries, providers, payment methods,
+banks, spend, hourly volume, dates, seed, and row count. Probabilities use decimals (`0.17` means
+`17%`), while `weight` values are relative weights.
 
-## Archivos del generador
+## Generator files
 
-- [`generation_config.py`](generation_config.py): contiene todos los parámetros editables del dataset. Aquí se configuran las fechas y cantidad de filas predeterminadas, monedas y tipos de cambio, distribución de gasto, comercios, países, proveedores, métodos, bancos, pesos de volumen por día y hora, probabilidades de rechazo, offsets y distribución de códigos ISO-8583.
-- [`dataset_generator.py`](dataset_generator.py): es el motor de generación. Combina los parámetros, calcula la probabilidad natural de rechazo, aplica la regla de incidente ganadora, genera timestamps y valores monetarios, escribe el CSV y audita su esquema y consistencia.
-- [`app.py`](app.py): inicia el servidor HTTP local. Entrega el HTML y los endpoints de configuración, generación y descarga; además valida filas, nombre del archivo, fechas, horas, tasas de proveedor y reglas antes de llamar al motor.
-- [`index.html`](index.html): contiene la interfaz Control Tower, sus estilos y la lógica del navegador. Permite elegir cantidad de filas, archivo, fechas, horas, tasas base e incrementos específicos por código ISO-8583.
-- [`generate_baseline.py`](generate_baseline.py): ejecuta una generación reproducible de un millón de transacciones con la semilla y el período configurados, y luego audita el resultado.
-- [`generate_dataset.ipynb`](generate_dataset.ipynb): ofrece una alternativa interactiva en Jupyter para configurar reglas, generar el dataset y revisar una muestra de la auditoría.
-- [`decisiones_dataset.md`](decisiones_dataset.md): documenta las decisiones de modelado, fuentes, supuestos, fórmulas de probabilidades, distribución de códigos y comportamiento de las reglas.
-- [`README.md`](README.md): explica la estructura del generador y cómo ejecutar sus dos flujos principales.
+- [`generation_config.py`](generation_config.py): contains every editable dataset parameter.
+  Configure default dates and row count, currencies and exchange rates, spend distribution,
+  merchants, countries, providers, payment methods, banks, volume weights by day and hour,
+  decline probabilities, offsets, and ISO-8583 code distribution here.
+- [`dataset_generator.py`](dataset_generator.py): the generation engine. It combines parameters,
+  calculates the natural decline probability, applies the winning incident rule, generates
+  timestamps and monetary values, writes the CSV, and audits its schema and consistency.
+- [`app.py`](app.py): starts the local HTTP server. It serves the HTML and configuration,
+  generation, and download endpoints. It also validates rows, filenames, dates, hours, provider
+  rates, and rules before calling the engine.
+- [`index.html`](index.html): contains the Control Tower interface, styling, and browser logic.
+  It lets users choose row count, output file, dates, hours, base rates, and ISO-8583-code-specific
+  increments.
+- [`generate_baseline.py`](generate_baseline.py): runs a reproducible generation of one million
+  transactions using the configured seed and time period, then audits the result.
+- [`generate_dataset.ipynb`](generate_dataset.ipynb): provides an interactive Jupyter alternative
+  for configuring rules, generating the dataset, and reviewing an audit sample.
+- [`decisiones_dataset.md`](decisiones_dataset.md): documents the modeling decisions, sources,
+  assumptions, probability formulas, code distribution, and rule behavior.
+- [`README.md`](README.md): explains the generator structure and how to run its two main flows.
 
-Desde la raíz del proyecto, generar el baseline de 1.000.000 de filas:
+From the project root, generate the 1,000,000-row baseline:
 
 ```bash
 python scripts/ingestion/generator/generate_baseline.py
 ```
 
-Iniciar el front para controlar la ingestión en vivo:
+Start the UI to control live ingestion:
 
 ```bash
 make ingestion-generator
 ```
 
-Abrir [http://127.0.0.1:8002](http://127.0.0.1:8002), iniciar o detener el stream y activar una de las dos simulaciones preseleccionadas: un spike global de fallos o uno específico para MercadoPago.
+Open [http://127.0.0.1:8002](http://127.0.0.1:8002), start or stop the stream, and enable one of
+the two preselected simulations: a global failure spike or a MercadoPago-specific one.
 
-## Ingestión en vivo acelerada
+## Accelerated live ingestion
 
-Con PostgreSQL iniciado y configurado en `data/.env`, el mismo front controla la ingestión directamente en la base. Elegí el **promedio de transacciones por minuto** y presioná **Start live ingestion**. El inicio se calcula siempre en el servidor como el segundo siguiente al `issued_timestamp` más reciente en PostgreSQL; si no hay transacciones, usa el segundo actual. Así, cada reinicio continúa la línea de tiempo existente sin solapar datos. Cada segundo real inserta un lote que representa un segundo de datos, manteniendo el promedio configurado por minuto distribuido entre sus 60 segundos. Los `issued_timestamp` avanzan en tiempo real. Cada hora mantiene un perfil normal propio con desvío estándar de 35%, y cada segundo varía alrededor de ese perfil; así los totales horarios no quedan fijos cerca de 6.000. Las tasas y reglas visibles al iniciar se congelan para esa ejecución. **Stop** detiene el stream después del lote en curso.
+With PostgreSQL running and configured in `data/.env`, the same UI controls ingestion directly
+into the database. Choose the **average transactions per minute** and press **Start live ingestion**.
+The server starts one second after the latest persisted `issued_timestamp`, or at the current second
+when the database is empty. Each real second inserts a batch for one second of timestamps while
+preserving the configured transaction average across the minute. This lets a restarted stream
+continue the existing timeline without overlaps. Each hour receives its own normal volume profile
+with a 35% standard deviation, and each second varies by 15% around that profile. The rates and
+rules visible at startup are frozen for that run. **Stop** stops the stream after the current batch.
 
-El toggle **Global failure spike** establece una tasa base de rechazo de 85% para todos los proveedores. **Break MercadoPago** hace lo mismo sólo para MercadoPago. **Break BancoEstado in Chile** agrega reglas de rechazo de 80 puntos porcentuales a las transacciones de BancoEstado en Chile, con código ISO-8583 `51`. Los escenarios son mutuamente excluyentes y se aplican desde el siguiente segundo; al apagar uno, el stream vuelve al perfil normal predeterminado.
+The **Global failure spike** toggle sets an 85% base decline rate for every provider. **Break
+MercadoPago** does the same for MercadoPago only. **Break BancoEstado in Chile** adds 80 percentage
+points of decline probability to BancoEstado transactions in Chile, using ISO-8583 code `51`.
+Scenarios are mutually exclusive and take effect from the next second. Turning one off returns the
+stream to the default normal profile.
 
-El servidor del generador usa el puerto `8002` por defecto para no competir con el Dashboard API (`8000`). Se pueden instalar las dependencias requeridas con:
+The generator server uses port `8002` by default so it does not compete with the Dashboard API
+(`8000`). Install the required dependencies with:
 
 ```bash
 pip install -r scripts/ingestion/requirements.txt
 ```
 
-Tanto `baseline.csv` como los CSV generados desde el front se guardan en `scripts/ingestion/generator/`, independientemente del directorio desde el que se ejecute el comando.
+Both `baseline.csv` and CSVs generated from the UI are saved to
+`scripts/ingestion/generator/`, regardless of the directory from which the command is run.
