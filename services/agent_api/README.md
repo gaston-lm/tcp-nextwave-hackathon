@@ -21,7 +21,12 @@ flowchart TD
     Deploys --> Reviewer
     Reviewer --> Writer[IncidentWriter\ndeterministic transaction]
     Writer --> Incidents[(incidents)]
-    Writer --> Response[API response\ndetector + reviewer + persistence IDs]
+    Incidents --> Actions[ActionTaker\nstrict JSON Schema output]
+    Actions --> ProviderOptions[Merchant-approved\nprovider lookup]
+    ProviderOptions --> Actions
+    Actions --> ActionWriter[IncidentActionWriter\ndeterministic transaction]
+    ActionWriter --> IncidentActions[(incidents_actions)]
+    ActionWriter --> Response[API response\ndetector + reviewer + actions]
 ```
 
 ## Run locally
@@ -49,9 +54,11 @@ Run payment anomaly detection. It analyzes the latest *completed* five-minute bu
 pass `as_of` to make a demo or test use a specific point in time.
 
 The response contains the structured detector result, a `reviewer` result with
-`new_incidents` and `updated_incidents`, and a `persistence` record. A deterministic
-SQLAlchemy writer applies the reviewer proposals after the agent workflow; neither agent writes
-to the database directly.
+`new_incidents` and `updated_incidents`, the per-new-incident `action_taker` results, and both
+persistence records. A deterministic SQLAlchemy writer applies reviewer and action proposals;
+agents never write to the database directly. ActionTaker selects exactly one draft-only action
+per new incident: linked deployment rollback guidance, otherwise an approved provider-switch
+recommendation with provider escalation draft, otherwise a merchant shared-Slack alert draft.
 
 ```sh
 curl -X POST http://localhost:8001/investigations \

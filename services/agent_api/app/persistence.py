@@ -7,14 +7,20 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from .db_models import Incident
-from .models import IncidentProposal, IncidentReviewDecision
+from .db_models import Incident, IncidentAction
+from .models import ActionProposal, IncidentProposal, IncidentReviewDecision
 
 
 @dataclass(frozen=True)
 class PersistedIncidentChanges:
     created_incident_ids: list[int]
     updated_incident_ids: list[int]
+
+
+@dataclass(frozen=True)
+class PersistedActions:
+    action_ids: list[int]
+    action_types: list[str]
 
 
 class IncidentWriter:
@@ -65,3 +71,37 @@ class IncidentWriter:
         incident.affected_transaction_count = proposal.affected_transaction_count
         incident.started_at = proposal.started_at
         incident.last_seen_at = proposal.last_seen_at
+
+
+class IncidentActionWriter:
+    """Deterministic validator and writer for ActionTaker proposals."""
+
+    _action_types = {
+        "deploy_rollback",
+        "recommend_switch_provider_to_merchant",
+        "post_slack_alert_to_channel",
+    }
+
+    def __init__(self, session_factory: async_sessionmaker) -> None:
+        self.session_factory = session_factory
+
+    async def apply(self, proposals: list[ActionProposal]) -> PersistedActions:
+        if len({item.incident_id for item in proposals}) != len(proposals):
+            raise ValueError("ActionTaker may create at most one action per incident")
+        if invalid := {item.action_type for item in proposals} - self._action_types:
+            raise ValueError(f"Unsupported action types: {sorted(invalid)}")
+        async with self.session_factory.begin() as session:
+            actions = [
+                IncidentAction(
+                    incident_id=item.incident_id,
+                    action_type=item.action_type,
+                    action_details=item.action_details,
+                )
+                for item in proposals
+            ]
+            session.add_all(actions)
+            await session.flush()
+            return PersistedActions(
+                action_ids=[item.action_id for item in actions],
+                action_types=[item.action_type for item in actions],
+            )

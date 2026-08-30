@@ -43,6 +43,10 @@ class IncidentReadUpdate(BaseModel):
 
 def serialize_incident(row):
     signature = row[5] if isinstance(row[5], dict) else json.loads(row[5])
+    actions_value = row[14] or []
+    actions = (
+        actions_value if isinstance(actions_value, list) else json.loads(actions_value)
+    )
     return {
         "key": row[0],
         "title": row[1],
@@ -57,12 +61,14 @@ def serialize_incident(row):
         "affectedTransactions": row[8],
         "relatedIncidentIds": row[12] or [],
         "relatedDeploymentIds": row[13] or [],
-        "agentAction": None,
-        "agentActionAt": None,
+        "actions": actions,
+        "agentAction": actions[-1]["actionDetails"] if actions else None,
+        "agentActionType": actions[-1]["actionType"] if actions else None,
+        "agentActionAt": actions[-1]["createdAt"] if actions else None,
         "startedAt": row[9],
         "lastSeenAt": row[10],
         "isRead": row[11],
-        "createdAt": row[14],
+        "createdAt": row[15],
     }
 
 
@@ -77,10 +83,20 @@ def health():
 def list_incidents():
     with cursor() as db_cursor:
         db_cursor.execute("""
-            SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
+            SELECT incidents.incident_id, title, severity, status, overview, dimension_signatures::text,
                    estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
-                   related_incidents, related_deployments, created_at
-            FROM incidents ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
+                   related_incidents, related_deployments,
+                   COALESCE((
+                       SELECT json_agg(json_build_object(
+                           'actionType', action_type,
+                           'actionDetails', action_details,
+                           'createdAt', created_at
+                       ) ORDER BY created_at)
+                       FROM incidents_actions
+                       WHERE incidents_actions.incident_id = incidents.incident_id
+                   ), '[]'::json), incidents.created_at
+            FROM incidents
+            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
         """)
         return [serialize_incident(row) for row in db_cursor.fetchall()]
 
@@ -174,10 +190,20 @@ def get_incident(incident_id: int):
     with cursor() as db_cursor:
         db_cursor.execute(
             """
-            SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
+            SELECT incidents.incident_id, title, severity, status, overview, dimension_signatures::text,
                    estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
-                   related_incidents, related_deployments, created_at
-            FROM incidents WHERE incident_id = %s
+                   related_incidents, related_deployments,
+                   COALESCE((
+                       SELECT json_agg(json_build_object(
+                           'actionType', action_type,
+                           'actionDetails', action_details,
+                           'createdAt', created_at
+                       ) ORDER BY created_at)
+                       FROM incidents_actions
+                       WHERE incidents_actions.incident_id = incidents.incident_id
+                   ), '[]'::json), incidents.created_at
+            FROM incidents
+            WHERE incidents.incident_id = %s
         """,
             (incident_id,),
         )
@@ -192,13 +218,27 @@ def update_incident_read_status(incident_id: int, update: IncidentReadUpdate):
     with cursor() as db_cursor:
         db_cursor.execute(
             """
-            UPDATE incidents
-            SET is_read = %s
-            WHERE incident_id = %s
-            RETURNING incident_id, title, severity, status, overview, dimension_signatures::text,
-                      estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
-                      related_incidents, related_deployments, created_at
-        """,
+            WITH updated AS (
+                UPDATE incidents
+                SET is_read = %s
+                WHERE incident_id = %s
+                RETURNING *
+            )
+            SELECT updated.incident_id, title, severity, status, overview,
+                   dimension_signatures::text, estimated_impact, approval_rate_drop,
+                   affected_transaction_count, started_at, last_seen_at, is_read,
+                   related_incidents, related_deployments,
+                   COALESCE((
+                       SELECT json_agg(json_build_object(
+                           'actionType', action_type,
+                           'actionDetails', action_details,
+                           'createdAt', created_at
+                       ) ORDER BY created_at)
+                       FROM incidents_actions
+                       WHERE incidents_actions.incident_id = updated.incident_id
+                   ), '[]'::json), updated.created_at
+            FROM updated
+            """,
             (update.is_read, incident_id),
         )
         incident = db_cursor.fetchone()

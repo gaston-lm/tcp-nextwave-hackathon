@@ -2,7 +2,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .anomaly_detection import IncidentReviewerResult, PaymentAnomalyDetectionResult
+from .anomaly_detection import (
+    ActionTakerResult,
+    IncidentReviewerResult,
+    PaymentAnomalyDetectionResult,
+)
 
 
 class InvestigationRequest(BaseModel):
@@ -15,6 +19,13 @@ class IncidentPersistence(BaseModel):
     updated_incident_ids: list[int]
 
 
+class ActionPersistence(BaseModel):
+    action_ids: list[int]
+    action_types: list[str]
+
+
 class InvestigationResponse(PaymentAnomalyDetectionResult):
     reviewer: IncidentReviewerResult
     persistence: IncidentPersistence
+    action_taker: list[ActionTakerResult]
+    action_persistence: ActionPersistence
