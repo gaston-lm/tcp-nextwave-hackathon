@@ -49,19 +49,19 @@ the two preselected simulations: a global failure spike or a MercadoPago-specifi
 ## Accelerated live ingestion
 
 With PostgreSQL running and configured in `data/.env`, the same UI controls ingestion directly
-into the database. Choose the **average transactions per minute**, the simulated start time, and
-press **Start live ingestion**. The generator keeps its own clock: each real second inserts a
-batch representing one simulated minute, and `issued_timestamp` values fall within that minute,
-not wall-clock time. Each simulated hour receives its own normal volume profile with a 35%
-standard deviation, and each minute varies by 15% around that profile. This prevents hourly totals
-from being fixed near 6,000. The rates and rules visible at startup are frozen for that run.
-**Stop** stops the stream after the current batch.
+into the database. Choose the **average transactions per minute** and press **Start live ingestion**.
+The server starts one second after the latest persisted `issued_timestamp`, or at the current second
+when the database is empty. Each real second inserts a batch for one second of timestamps while
+preserving the configured transaction average across the minute. This lets a restarted stream
+continue the existing timeline without overlaps. Each hour receives its own normal volume profile
+with a 35% standard deviation, and each second varies by 15% around that profile. The rates and
+rules visible at startup are frozen for that run. **Stop** stops the stream after the current batch.
 
 The **Global failure spike** toggle sets an 85% base decline rate for every provider. **Break
 MercadoPago** does the same for MercadoPago only. **Break BancoEstado in Chile** adds 80 percentage
 points of decline probability to BancoEstado transactions in Chile, using ISO-8583 code `51`.
-Scenarios are mutually exclusive and take effect from the next simulated minute. Turning one off
-returns the stream to the default normal profile.
+Scenarios are mutually exclusive and take effect from the next second. Turning one off returns the
+stream to the default normal profile.
 
 The generator server uses port `8002` by default so it does not compete with the Dashboard API
 (`8000`). Install the required dependencies with:

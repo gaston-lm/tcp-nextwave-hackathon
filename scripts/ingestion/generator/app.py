@@ -88,18 +88,6 @@ def validate_generation_dates(start_value, end_value):
     return start_date, end_date
 
 
-def validate_live_start(value):
-    if not isinstance(value, str):
-        raise ValueError("La hora inicial de la simulación es obligatoria")
-    try:
-        start_at = datetime.fromisoformat(value)
-    except ValueError:
-        raise ValueError("La hora inicial debe usar un formato ISO válido") from None
-    if start_at.tzinfo is not None:
-        raise ValueError("La hora inicial no debe incluir una zona horaria")
-    return start_at
-
-
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -149,9 +137,6 @@ class Handler(BaseHTTPRequestHandler):
                     "default_filename": OUTPUT_PATH.name,
                     "start_date": START_DATE.isoformat(sep=" "),
                     "end_date": END_DATE.isoformat(sep=" "),
-                    "live_start_at": datetime.now()
-                    .replace(second=0, microsecond=0)
-                    .isoformat(sep=" "),
                     "live_rows_per_minute": 10000,
                     "max_live_rows_per_minute": 10_000,
                     "provider_rates": default_provider_rates(),
@@ -238,14 +223,13 @@ class Handler(BaseHTTPRequestHandler):
                 rows_per_minute = validate_rows_per_minute(
                     payload.get("rows_per_minute")
                 )
-                start_at = validate_live_start(payload.get("start_at"))
                 provider_rates = validate_provider_rates(payload.get("provider_rates"))
                 rules = validate_decline_rules(payload.get("rules", []), provider_rates)
                 self.send_json(
                     202,
                     LIVE_STREAM.start(
                         rows_per_minute,
-                        start_at,
+                        None,
                         provider_rates,
                         rules,
                     ),

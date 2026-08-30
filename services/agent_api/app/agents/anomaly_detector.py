@@ -61,7 +61,7 @@ class AnomalyDetector:
             model=self.model,
             instructions=PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS,
             input=(
-                "Investigate the completed five-minute payment window "
+                "Investigate the completed one-minute payment window "
                 f"[{observation_window_start.isoformat()}, "
                 f"{observation_window_end.isoformat()}). This is the canonical "
                 "observation window shared by all Control Tower agents. Begin with "

@@ -184,8 +184,8 @@ def test_metrics_exposes_a_timezone_aware_observation_window():
         as_of=datetime(2026, 8, 30, 3, 7, 40, tzinfo=UTC),
     )
 
-    assert metrics.observation_window_start == datetime(2026, 8, 30, 3, 0, tzinfo=UTC)
-    assert metrics.observation_window_end == datetime(2026, 8, 30, 3, 5, tzinfo=UTC)
+    assert metrics.observation_window_start == datetime(2026, 8, 30, 3, 6, tzinfo=UTC)
+    assert metrics.observation_window_end == datetime(2026, 8, 30, 3, 7, tzinfo=UTC)
 
 
 def test_reviewer_derives_proposal_timestamps_from_observation_window():

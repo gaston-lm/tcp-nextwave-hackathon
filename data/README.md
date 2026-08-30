@@ -42,6 +42,9 @@ inserts the CSV's mapping and transaction rows, then calls
 `refresh_baseline_metrics`. Baselines are calculated only after history is present, so they
 never include an empty database or predate the history load.
 
+The transaction schema includes an index on `issued_timestamp` so dashboard queries for the
+latest live activity can remain fast as generated transaction volume grows.
+
 ## Reset local data
 
 This removes the local database volume and all of its contents:

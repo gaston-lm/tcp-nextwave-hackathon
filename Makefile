@@ -4,7 +4,7 @@ LIVE_FILE ?= data/local/transactions.csv
 LIVE_RATE ?= 10
 LOCAL_DATABASE_ENV = env -u DATABASE_URL -u POSTGRES_HOST -u POSTGRES_PORT -u POSTGRES_DB -u POSTGRES_USER -u POSTGRES_PASSWORD
 
-.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingestion-generator ingest-live lint
+.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingestion-generator ingest-live agent-scheduled-investigation lint
 
 db-up:
 	docker compose -f data/docker-compose.yml up -d
@@ -20,6 +20,9 @@ dashboard-api:
 
 agent-api:
 	$(LOCAL_DATABASE_ENV) $(PYTHON) -m uvicorn services.agent_api.app.main:app --reload --port 8001
+
+agent-scheduled-investigation:
+	$(PYTHON) scripts/agent/run_scheduled_investigation.py
 
 dashboard:
 	npm --prefix apps/dashboard run dev
