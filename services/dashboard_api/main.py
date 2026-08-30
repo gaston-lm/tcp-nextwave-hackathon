@@ -145,14 +145,17 @@ def get_incident(incident_key: str):
 @app.patch("/api/incidents/{incident_key}/read")
 def update_incident_read_status(incident_key: str, update: IncidentReadUpdate):
     with cursor() as db_cursor:
-        db_cursor.execute("""
+        db_cursor.execute(
+            """
             UPDATE incidents
             SET is_read = %s
             WHERE incident_key = %s
             RETURNING incident_key, title, severity, status, country, provider_name, overview,
                       estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
                       started_at, last_seen_at, is_read
-        """, (update.is_read, incident_key))
+        """,
+            (update.is_read, incident_key),
+        )
         incident = db_cursor.fetchone()
         if incident is None:
             raise HTTPException(status_code=404, detail="Incident not found")
