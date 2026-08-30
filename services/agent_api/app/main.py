@@ -6,9 +6,9 @@ import asyncpg
 from fastapi import FastAPI, HTTPException, Request
 from openai import OpenAIError
 
+from .agent import TowerControlAgent
 from .metrics import MetricsService
 from .models import InvestigationRequest, InvestigationResponse
-from .agent import TowerControlAgent
 from .settings import get_settings
 
 
@@ -28,7 +28,9 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/investigations", response_model=InvestigationResponse)
-async def investigate(payload: InvestigationRequest, request: Request) -> InvestigationResponse:
+async def investigate(
+    payload: InvestigationRequest, request: Request
+) -> InvestigationResponse:
     if get_settings().openai_api_key is None:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
     metrics = MetricsService(
@@ -38,7 +40,13 @@ async def investigate(payload: InvestigationRequest, request: Request) -> Invest
     try:
         detection = await TowerControlAgent(metrics).investigate(payload.max_steps)
     except OpenAIError as error:
-        raise HTTPException(status_code=502, detail=f"OpenAI investigation failed: {error}") from error
+        raise HTTPException(
+            status_code=502, detail=f"OpenAI investigation failed: {error}"
+        ) from error
     except Exception as error:
-        raise HTTPException(status_code=500, detail=f"Unexpected error occurred: {error}") from error
-    return InvestigationResponse(result=detection.result, steps_used=detection.steps_used)
+        raise HTTPException(
+            status_code=500, detail=f"Unexpected error occurred: {error}"
+        ) from error
+    return InvestigationResponse(
+        result=detection.result, steps_used=detection.steps_used
+    )

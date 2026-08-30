@@ -20,7 +20,11 @@ HEADER = (
 
 
 def test_reads_valid_csv(tmp_path):
-    path = write_csv(tmp_path, HEADER + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,true,51,ARS,100.5,10\n")
+    path = write_csv(
+        tmp_path,
+        HEADER
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,true,51,ARS,100.5,10\n",
+    )
 
     transactions = read_transactions(path)
 
@@ -38,26 +42,48 @@ def test_rejects_missing_required_column(tmp_path):
 
 
 def test_rejects_invalid_integer(tmp_path):
-    path = write_csv(tmp_path, HEADER + "AR,Pay,1,card,1,Merchant,not-an-id,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10\n")
+    path = write_csv(
+        tmp_path,
+        HEADER
+        + "AR,Pay,1,card,1,Merchant,not-an-id,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10\n",
+    )
 
     with pytest.raises(IngestionError, match="row 2: invalid integer in merchant_id"):
         read_transactions(path)
 
 
 def test_rejects_extra_value_in_row(tmp_path):
-    path = write_csv(tmp_path, HEADER + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10,extra\n")
+    path = write_csv(
+        tmp_path,
+        HEADER
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10,extra\n",
+    )
 
     with pytest.raises(IngestionError, match="row 2: too many values"):
         read_transactions(path)
 
 
 def test_replays_transactions_in_configured_batches(monkeypatch, tmp_path):
-    path = write_csv(tmp_path, HEADER + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10\n" + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,100,2026-01-02T03:04:06,false,0,ARS,100.5,10\n")
+    path = write_csv(
+        tmp_path,
+        HEADER
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:05,false,0,ARS,100.5,10\n"
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,100,2026-01-02T03:04:06,false,0,ARS,100.5,10\n",
+    )
     batches = []
     monkeypatch.setattr("scripts.ingestion.stream_ingest.time.sleep", lambda _: None)
 
-    inserted = replay_transactions(read_transactions(path), 1000, 1, lambda batch: batches.append(batch) or len(batch))
+    inserted = replay_transactions(
+        read_transactions(path),
+        1000,
+        1,
+        lambda batch: batches.append(batch) or len(batch),
+    )
 
     assert inserted == 2
     assert [len(batch) for batch in batches] == [1, 1]
-    assert all(item.issued_timestamp.date() == datetime.now(timezone.utc).date() for batch in batches for item in batch)
+    assert all(
+        item.issued_timestamp.date() == datetime.now(timezone.utc).date()
+        for batch in batches
+        for item in batch
+    )

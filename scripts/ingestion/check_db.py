@@ -15,8 +15,8 @@ except ImportError:  # Allows `python scripts/ingestion/check_db.py`.
 def main() -> int:
     try:
         try:
-            from dotenv import load_dotenv
             import psycopg2
+            from dotenv import load_dotenv
         except ModuleNotFoundError as error:
             raise IngestionError(
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"

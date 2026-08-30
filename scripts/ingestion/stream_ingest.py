@@ -13,9 +13,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from .load_history import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
+    from .load_history import (
+        IngestionError,
+        Transaction,
+        database_config,
+        insert_transactions,
+        iter_transactions,
+    )
 except ImportError:  # Allows `python scripts/ingestion/stream_ingest.py ...`.
-    from load_history import IngestionError, Transaction, database_config, insert_transactions, iter_transactions
+    from load_history import (
+        IngestionError,
+        Transaction,
+        database_config,
+        insert_transactions,
+        iter_transactions,
+    )
 
 
 def replay_transactions(
@@ -56,10 +68,19 @@ def replay_transactions(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Replay a payment CSV as a paced live stream.")
+    parser = argparse.ArgumentParser(
+        description="Replay a payment CSV as a paced live stream."
+    )
     parser.add_argument("csv_file", type=Path, help="Path to the input CSV file")
-    parser.add_argument("--rows-per-second", type=float, default=10.0, help="Replay rate (default: 10)")
-    parser.add_argument("--batch-size", type=int, default=25, help="Rows per database insert (default: 25)")
+    parser.add_argument(
+        "--rows-per-second", type=float, default=10.0, help="Replay rate (default: 10)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=25,
+        help="Rows per database insert (default: 25)",
+    )
     parser.add_argument(
         "--transaction-id-offset",
         type=int,
@@ -78,8 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
         try:
-            from dotenv import load_dotenv
             import psycopg2
+            from dotenv import load_dotenv
         except ModuleNotFoundError as error:
             raise IngestionError(
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"
@@ -90,7 +111,8 @@ def main(argv: list[str] | None = None) -> int:
         transactions = iter_transactions(args.csv_file)
         logging.info(
             "Replaying at %.2f rows/second in batches of %d with transaction ID offset %d. Press Ctrl+C to stop.",
-            args.rows_per_second, args.batch_size,
+            args.rows_per_second,
+            args.batch_size,
             args.transaction_id_offset,
         )
         with psycopg2.connect(**database_config()) as connection:

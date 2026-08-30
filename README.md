@@ -35,3 +35,20 @@ make dashboard      # Vite development server
 - `docs/` — challenge and product documentation.
 
 Each component has its own README with setup and usage details.
+
+## Developer checks
+
+Install the shared development tools and activate the hooks once per clone:
+
+```bash
+pip install -r requirements-dev.txt
+pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+Commits must follow Conventional Commits, for example `feat: add incident memory`
+or `fix(agent): handle an empty baseline`. Run all Python lint and format checks
+at any time with:
+
+```bash
+make lint
+```

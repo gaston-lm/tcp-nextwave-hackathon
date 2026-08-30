@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from .agents.anomaly_detector import AnomalyDetector
-from .models import PaymentAnomalyDetectionResult
 from .metrics import MetricsService
+from .models import PaymentAnomalyDetectionResult
 from .observability import traced_agent
 from .settings import Settings
 
@@ -16,7 +16,9 @@ class TowerControlAgent:
     creation will become later stages under this same root agent boundary.
     """
 
-    def __init__(self, metrics: MetricsService, settings: Settings | None = None) -> None:
+    def __init__(
+        self, metrics: MetricsService, settings: Settings | None = None
+    ) -> None:
         self.metrics = metrics
         self.settings = settings
 

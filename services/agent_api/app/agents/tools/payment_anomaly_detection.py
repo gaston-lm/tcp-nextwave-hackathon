@@ -29,7 +29,11 @@ PAYMENT_ANOMALY_DETECTION_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "name": "get_current_window_overview",
         "description": "Get overall acceptance metrics for the latest completed five-minute window and its stored weekday baseline. Call this first.",
-        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
         "strict": True,
     },
     {

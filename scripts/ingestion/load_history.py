@@ -16,10 +16,22 @@ from pathlib import Path
 from typing import Iterable
 
 CSV_COLUMNS = (
-    "country", "provider_name", "provider_id", "method_name", "method_id",
-    "merchant_name", "merchant_id", "issuing_bank", "receiving_bank",
-    "transaction_id", "issued_timestamp", "is_declined", "decline_code",
-    "currency", "value_transaction_currency", "value",
+    "country",
+    "provider_name",
+    "provider_id",
+    "method_name",
+    "method_id",
+    "merchant_name",
+    "merchant_id",
+    "issuing_bank",
+    "receiving_bank",
+    "transaction_id",
+    "issued_timestamp",
+    "is_declined",
+    "decline_code",
+    "currency",
+    "value_transaction_currency",
+    "value",
 )
 
 
@@ -110,8 +122,12 @@ def iter_transactions(path: Path) -> Iterable[Transaction]:
         with path.open(newline="", encoding="utf-8-sig") as csv_file:
             reader = csv.DictReader(csv_file)
             received_columns = tuple(reader.fieldnames or ())
-            missing = [column for column in CSV_COLUMNS if column not in received_columns]
-            unexpected = [column for column in received_columns if column not in CSV_COLUMNS]
+            missing = [
+                column for column in CSV_COLUMNS if column not in received_columns
+            ]
+            unexpected = [
+                column for column in received_columns if column not in CSV_COLUMNS
+            ]
             if missing:
                 raise IngestionError(f"Missing required column {missing[0]!r}")
             if unexpected:
@@ -124,20 +140,40 @@ def iter_transactions(path: Path) -> Iterable[Transaction]:
                     )
                 yield Transaction(
                     country=_required(row["country"], "country", row_number),
-                    provider_name=_required(row["provider_name"], "provider_name", row_number),
+                    provider_name=_required(
+                        row["provider_name"], "provider_name", row_number
+                    ),
                     provider_id=_integer(row["provider_id"], "provider_id", row_number),
-                    method_name=_required(row["method_name"], "method_name", row_number),
+                    method_name=_required(
+                        row["method_name"], "method_name", row_number
+                    ),
                     method_id=_integer(row["method_id"], "method_id", row_number),
-                    merchant_name=_required(row["merchant_name"], "merchant_name", row_number),
+                    merchant_name=_required(
+                        row["merchant_name"], "merchant_name", row_number
+                    ),
                     merchant_id=_integer(row["merchant_id"], "merchant_id", row_number),
-                    issuing_bank=_required(row["issuing_bank"], "issuing_bank", row_number),
-                    receiving_bank=_required(row["receiving_bank"], "receiving_bank", row_number),
-                    transaction_id=_integer(row["transaction_id"], "transaction_id", row_number),
-                    issued_timestamp=_timestamp(row["issued_timestamp"], "issued_timestamp", row_number),
+                    issuing_bank=_required(
+                        row["issuing_bank"], "issuing_bank", row_number
+                    ),
+                    receiving_bank=_required(
+                        row["receiving_bank"], "receiving_bank", row_number
+                    ),
+                    transaction_id=_integer(
+                        row["transaction_id"], "transaction_id", row_number
+                    ),
+                    issued_timestamp=_timestamp(
+                        row["issued_timestamp"], "issued_timestamp", row_number
+                    ),
                     is_declined=_boolean(row["is_declined"], "is_declined", row_number),
-                    decline_code=_integer(row["decline_code"], "decline_code", row_number),
+                    decline_code=_integer(
+                        row["decline_code"], "decline_code", row_number
+                    ),
                     currency=_required(row["currency"], "currency", row_number),
-                    value_transaction_currency=_number(row["value_transaction_currency"], "value_transaction_currency", row_number),
+                    value_transaction_currency=_number(
+                        row["value_transaction_currency"],
+                        "value_transaction_currency",
+                        row_number,
+                    ),
                     value=_number(row["value"], "value", row_number),
                 )
     except FileNotFoundError as error:
@@ -152,13 +188,21 @@ def read_transactions(path: Path) -> list[Transaction]:
 
 
 def database_config() -> dict[str, str]:
-    required = ("POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD")
+    required = (
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+    )
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise IngestionError(f"Missing required environment variable {missing[0]}")
     return {
-        "host": os.environ["POSTGRES_HOST"], "port": os.environ["POSTGRES_PORT"],
-        "dbname": os.environ["POSTGRES_DB"], "user": os.environ["POSTGRES_USER"],
+        "host": os.environ["POSTGRES_HOST"],
+        "port": os.environ["POSTGRES_PORT"],
+        "dbname": os.environ["POSTGRES_DB"],
+        "user": os.environ["POSTGRES_USER"],
         "password": os.environ["POSTGRES_PASSWORD"],
     }
 
@@ -169,38 +213,73 @@ def insert_transactions(connection, transactions: Iterable[Transaction]) -> int:
     if not transaction_rows:
         return 0
 
-    values = [(
-        item.country, item.provider_name, item.provider_id, item.method_name,
-        item.method_id, item.merchant_name, item.merchant_id, item.issuing_bank,
-        item.receiving_bank, item.transaction_id, item.issued_timestamp,
-        item.is_declined, item.decline_code, item.currency,
-        item.value_transaction_currency, item.value,
-    ) for item in transaction_rows]
+    values = [
+        (
+            item.country,
+            item.provider_name,
+            item.provider_id,
+            item.method_name,
+            item.method_id,
+            item.merchant_name,
+            item.merchant_id,
+            item.issuing_bank,
+            item.receiving_bank,
+            item.transaction_id,
+            item.issued_timestamp,
+            item.is_declined,
+            item.decline_code,
+            item.currency,
+            item.value_transaction_currency,
+            item.value,
+        )
+        for item in transaction_rows
+    ]
     providers = {
-        (item.merchant_id, item.provider_id):
-            (item.merchant_id, item.merchant_name, item.provider_id, item.provider_name)
+        (item.merchant_id, item.provider_id): (
+            item.merchant_id,
+            item.merchant_name,
+            item.provider_id,
+            item.provider_name,
+        )
         for item in transaction_rows
     }
     methods = {
-        (item.provider_id, item.method_id):
-            (item.provider_id, item.provider_name, item.method_id, item.method_name)
+        (item.provider_id, item.method_id): (
+            item.provider_id,
+            item.provider_name,
+            item.method_id,
+            item.method_name,
+        )
         for item in transaction_rows
     }
     with connection.cursor() as cursor:
         from psycopg2.extras import execute_values
-        execute_values(cursor, """
+
+        execute_values(
+            cursor,
+            """
             INSERT INTO providers_by_merchant (merchant_id, merchant_name, provider_id, provider_name)
             VALUES %s
             ON CONFLICT (merchant_id, provider_id) DO UPDATE
             SET merchant_name = EXCLUDED.merchant_name, provider_name = EXCLUDED.provider_name
-        """, list(providers.values()), page_size=1000)
-        execute_values(cursor, """
+        """,
+            list(providers.values()),
+            page_size=1000,
+        )
+        execute_values(
+            cursor,
+            """
             INSERT INTO methods_by_provider (provider_id, provider_name, method_id, method_name)
             VALUES %s
             ON CONFLICT (provider_id, method_id) DO UPDATE
             SET provider_name = EXCLUDED.provider_name, method_name = EXCLUDED.method_name
-        """, list(methods.values()), page_size=1000)
-        inserted_rows = execute_values(cursor, """
+        """,
+            list(methods.values()),
+            page_size=1000,
+        )
+        inserted_rows = execute_values(
+            cursor,
+            """
             INSERT INTO transactions (
                 country, provider_name, provider_id, method_name, method_id, merchant_name, merchant_id,
                 issuing_bank, receiving_bank, transaction_id, issued_timestamp, is_declined,
@@ -208,20 +287,26 @@ def insert_transactions(connection, transactions: Iterable[Transaction]) -> int:
             ) VALUES %s
             ON CONFLICT (transaction_id) DO NOTHING
             RETURNING transaction_id
-        """, values, page_size=1000, fetch=True)
+        """,
+            values,
+            page_size=1000,
+            fetch=True,
+        )
     connection.commit()
     return len(inserted_rows)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Load a historical payment transaction CSV into PostgreSQL.")
+    parser = argparse.ArgumentParser(
+        description="Load a historical payment transaction CSV into PostgreSQL."
+    )
     parser.add_argument("csv_file", type=Path, help="Path to the history CSV file")
     args = parser.parse_args(argv)
     started = time.monotonic()
     try:
         try:
-            from dotenv import load_dotenv
             import psycopg2
+            from dotenv import load_dotenv
         except ModuleNotFoundError as error:
             raise IngestionError(
                 "Missing dependency. Install requirements with: pip install -r requirements.txt"

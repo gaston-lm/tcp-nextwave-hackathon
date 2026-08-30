@@ -8,15 +8,17 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from ..metrics import MetricsService
+from ..models import PaymentAnomalyDetectionResult
 from ..observability import traced_agent
 from ..settings import Settings, get_settings
-from ..models import PaymentAnomalyDetectionResult
 from .prompts import PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS
 from .tools import PAYMENT_ANOMALY_DETECTION_TOOLS
 
 
 class AnomalyDetector:
-    def __init__(self, metrics: MetricsService, settings: Settings | None = None) -> None:
+    def __init__(
+        self, metrics: MetricsService, settings: Settings | None = None
+    ) -> None:
         self.metrics = metrics
         settings = settings or get_settings()
         if settings.openai_api_key is None:
@@ -72,10 +74,18 @@ class AnomalyDetector:
             outputs = []
             for call in calls:
                 try:
-                    result = await self._call_tool(call.name, json.loads(call.arguments))
+                    result = await self._call_tool(
+                        call.name, json.loads(call.arguments)
+                    )
                 except (ValueError, json.JSONDecodeError) as error:
                     result = {"error": str(error)}
-                outputs.append({"type": "function_call_output", "call_id": call.call_id, "output": json.dumps(result, default=str)})
+                outputs.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call.call_id,
+                        "output": json.dumps(result, default=str),
+                    }
+                )
             response = await self.client.responses.create(
                 model=self.model,
                 instructions=PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS,

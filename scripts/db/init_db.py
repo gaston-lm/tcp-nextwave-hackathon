@@ -8,9 +8,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import psycopg2
-from psycopg2.errors import DuplicateTable
 from dotenv import load_dotenv
-
+from psycopg2.errors import DuplicateTable
 
 ROOT = Path(__file__).parents[2]
 DATA_DIR = ROOT / "data"
@@ -19,10 +18,10 @@ TEST_DASHBOARD_SEED = DATA_DIR / "seeds" / "dashboard_mock.sql"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ingestion.load_history import insert_transactions, read_transactions
-
 
 def main() -> None:
+    from scripts.ingestion.load_history import insert_transactions, read_transactions
+
     parser = argparse.ArgumentParser(
         description="Apply schema, load history, and refresh weekday baselines."
     )
@@ -64,7 +63,9 @@ def main() -> None:
             """)
             history_start, history_end = cursor.fetchone()
             if history_start is None:
-                raise RuntimeError("No transactions were loaded; baseline metrics cannot be calculated.")
+                raise RuntimeError(
+                    "No transactions were loaded; baseline metrics cannot be calculated."
+                )
             cursor.execute(
                 "SELECT refresh_baseline_metrics(%s, %s)",
                 (history_start, history_end + timedelta(microseconds=1)),

@@ -60,7 +60,9 @@ class MetricsService:
             raise ValueError(f"Unsupported filters: {sorted(invalid)}")
         return filters
 
-    @traced_tool("get_current_window_overview", "Gets current and baseline acceptance metrics.")
+    @traced_tool(
+        "get_current_window_overview", "Gets current and baseline acceptance metrics."
+    )
     async def overview(self) -> dict[str, Any]:
         sql = """
             WITH current_window AS (
@@ -92,14 +94,22 @@ class MetricsService:
             records = await connection.fetch(sql, self.window_start, self.window_end)
         return {record["period"]: dict(record) for record in records}
 
-    @traced_tool("get_current_segment_metrics", "Compares a diagnostic grain with its stored baseline.")
+    @traced_tool(
+        "get_current_segment_metrics",
+        "Compares a diagnostic grain with its stored baseline.",
+    )
     async def segment_metrics(
-        self, dimensions: list[str], filters: dict[str, str] | None = None, limit: int = 25
+        self,
+        dimensions: list[str],
+        filters: dict[str, str] | None = None,
+        limit: int = 25,
     ) -> list[dict[str, Any]]:
         dimensions = self._validate_dimensions(dimensions)
         filters = self._validate_filters(filters or {})
         if not set(filters).issubset(dimensions):
-            raise ValueError("Filters must also be included in the requested dimensions")
+            raise ValueError(
+                "Filters must also be included in the requested dimensions"
+            )
         limit = min(max(limit, 1), 50)
         columns = [DIMENSION_COLUMNS[dimension] for dimension in dimensions]
         dimensions_mask = sum(DIMENSION_MASKS[dimension] for dimension in dimensions)
@@ -152,7 +162,10 @@ class MetricsService:
             records = await connection.fetch(sql, *values)
         return [dict(record) for record in records]
 
-    @traced_tool("get_decline_code_distribution", "Gets decline-code distribution for a failing segment.")
+    @traced_tool(
+        "get_decline_code_distribution",
+        "Gets decline-code distribution for a failing segment.",
+    )
     async def decline_code_distribution(
         self, filters: dict[str, str], limit: int = 20
     ) -> list[dict[str, Any]]:
@@ -171,7 +184,7 @@ class MetricsService:
             FROM transactions
             WHERE issued_timestamp >= $1 AND issued_timestamp < $2
               AND is_declined
-              AND {' AND '.join(parts)}
+              AND {" AND ".join(parts)}
             GROUP BY decline_code
             ORDER BY decline_count DESC
             LIMIT ${len(values)}

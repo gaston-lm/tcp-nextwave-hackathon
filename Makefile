@@ -3,7 +3,7 @@ HISTORY ?= data/local/baseline.csv
 LIVE_FILE ?= data/local/transactions.csv
 LIVE_RATE ?= 10
 
-.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingest-live
+.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingest-live lint
 
 db-up:
 	docker compose -f data/docker-compose.yml up -d
@@ -25,3 +25,7 @@ dashboard:
 
 ingest-live:
 	$(PYTHON) scripts/ingestion/stream_ingest.py $(LIVE_FILE) --rows-per-second $(LIVE_RATE)
+
+lint:
+	$(PYTHON) -m ruff check .
+	$(PYTHON) -m ruff format --check .

@@ -35,7 +35,9 @@ def _configure_tracing(settings: Settings) -> OITracer | None:
         endpoint=settings.arize_collector_endpoint,
     )
     OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-    logger.info("Arize AX tracing initialized for project %s.", settings.arize_project_name)
+    logger.info(
+        "Arize AX tracing initialized for project %s.", settings.arize_project_name
+    )
     return OITracer(tracer_provider.get_tracer(__name__), config=TraceConfig())
 
 
