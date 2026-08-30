@@ -9,24 +9,59 @@ they cannot issue SQL directly.
 ## Orchestration
 
 ```mermaid
-flowchart TD
-    Request[POST /investigations] --> Metrics[MetricsService\nlatest five-minute window]
-    Metrics --> Detector[AnomalyDetector\nstrict JSON Schema output]
-    Detector --> Recent[SQLAlchemy repository\nall open incidents]
-    Recent --> Reviewer[IncidentReviewer\nstrict JSON Schema output]
-    Detector --> Reviewer
-    Reviewer --> Memory[Semantic search\nclosed incident memory]
-    Reviewer --> Deploys[Semantic search\npayment deployment logs]
-    Memory --> Reviewer
-    Deploys --> Reviewer
-    Reviewer --> Writer[IncidentWriter\ndeterministic transaction]
-    Writer --> Incidents[(incidents)]
-    Incidents --> Actions[ActionTaker\nstrict JSON Schema output]
-    Actions --> ProviderOptions[Merchant-approved\nprovider lookup]
-    ProviderOptions --> Actions
-    Actions --> ActionWriter[IncidentActionWriter\ndeterministic transaction]
-    ActionWriter --> IncidentActions[(incidents_actions)]
-    ActionWriter --> Response[API response\ndetector + reviewer + actions]
+flowchart LR
+    subgraph Detection[" "]
+        direction TB
+        Detector([AnomalyDetector])
+        Baseline[baseline_metrics]
+        LatestTransactions[latest_transactions]
+        BaselineMetrics[(baseline_metrics)]
+        Transactions[(transactions)]
+        Detector --> Baseline --> BaselineMetrics
+        Detector --> LatestTransactions --> Transactions
+    end
+
+    subgraph Review[" "]
+        direction TB
+        Reviewer([IncidentReviewer])
+        ClosedMemory[closed incident memory\nsemantic-search]
+        DeployLogs[latest deployment logs]
+        IncidentWriter[incident writer\ndeterministic process]
+        IncidentMemory[(incident_memory)]
+        DeploymentLogs[(deployment_logs)]
+        Incidents[(incidents)]
+        Reviewer --> ClosedMemory --> IncidentMemory
+        Reviewer --> DeployLogs --> DeploymentLogs
+        Reviewer --> IncidentWriter --> Incidents
+    end
+
+    subgraph Actions[" "]
+        direction TB
+        ActionTaker([ActionTaker])
+        DeployRollback[deploy_rollback]
+        ProviderAlternatives[get_merchant_provider_alternatives]
+        SwitchProvider[recommend_switch_provider_to_merchant]
+        SlackAlert[post_slack_alert_to_channel]
+        ProviderMappings[(providers_by_merchant)]
+        IncidentActions[(incidents_actions)]
+        ActionTaker --> DeployRollback --> IncidentActions
+        ActionTaker --> ProviderAlternatives --> ProviderMappings
+        ActionTaker --> SwitchProvider --> IncidentActions
+        ActionTaker --> SlackAlert --> IncidentActions
+    end
+
+    Detector --> Reviewer --> ActionTaker
+    Incidents -. persisted incident .-> ActionTaker
+
+    classDef agent fill:#e8f4ff,stroke:#2563eb,stroke-width:2px,color:#172554,font-weight:bold;
+    classDef tool fill:#ffffff,stroke:#94a3b8,stroke-width:1px,color:#334155,font-size:10px;
+    classDef database fill:#f8fafc,stroke:#64748b,stroke-width:1px,color:#334155,font-size:9px;
+    class Detector,Reviewer,ActionTaker agent;
+    class Baseline,LatestTransactions,ClosedMemory,DeployLogs,IncidentWriter,DeployRollback,ProviderAlternatives,SwitchProvider,SlackAlert tool;
+    class BaselineMetrics,Transactions,IncidentMemory,DeploymentLogs,Incidents,ProviderMappings,IncidentActions database;
+    style Detection fill:none,stroke:none
+    style Review fill:none,stroke:none
+    style Actions fill:none,stroke:none
 ```
 
 ## Run locally
