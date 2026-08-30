@@ -34,13 +34,21 @@ class MetricsService:
     ) -> None:
         self.pool = pool
         reference = as_of or datetime.now(UTC)
+        if reference.tzinfo is None:
+            reference = reference.replace(tzinfo=UTC)
         # Transactions use TIMESTAMP without time zone. The caller is responsible
         # for submitting a timestamp in the database's business time zone.
-        reference = reference.replace(tzinfo=None)
-        self.window_end = reference.replace(
-            minute=reference.minute - (reference.minute % 5), second=0, microsecond=0
+        business_reference = reference.replace(tzinfo=None)
+        self.window_end = business_reference.replace(
+            minute=business_reference.minute - (business_reference.minute % 5),
+            second=0,
+            microsecond=0,
         )
         self.window_start = self.window_end - timedelta(minutes=5)
+        self.observation_window_start = self.window_start.replace(
+            tzinfo=reference.tzinfo
+        )
+        self.observation_window_end = self.window_end.replace(tzinfo=reference.tzinfo)
 
     @staticmethod
     def _validate_dimensions(dimensions: list[str]) -> list[str]:

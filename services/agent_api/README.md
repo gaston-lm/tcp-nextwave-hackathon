@@ -51,7 +51,10 @@ The SQLAlchemy incident repository validates pooled database connections before 
 connections made stale by a local PostgreSQL restart are transparently recreated.
 
 Run payment anomaly detection. It analyzes the latest *completed* five-minute bucket;
-pass `as_of` to make a demo or test use a specific point in time.
+pass `as_of` to make a demo or test use a specific point in time. The API resolves this to a
+canonical `[started_at, last_seen_at)` window and supplies it to both agents. New incidents use
+the window start as `started_at`; all proposals use its end as `last_seen_at`; updates preserve
+the existing incident's `started_at`. Naive `as_of` values are interpreted as UTC.
 
 The response contains the structured detector result, a `reviewer` result with
 `new_incidents` and `updated_incidents`, the per-new-incident `action_taker` results, and both

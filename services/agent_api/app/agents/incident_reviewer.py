@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -55,9 +56,15 @@ class IncidentReviewer:
         self,
         investigation: AnomalyInvestigation,
         recent_incidents: list[RecentIncident],
+        observation_window_start: datetime,
+        observation_window_end: datetime,
         max_steps: int,
     ) -> IncidentReviewerResult:
         payload = {
+            "observation_window": {
+                "started_at": observation_window_start.isoformat(),
+                "last_seen_at": observation_window_end.isoformat(),
+            },
             "anomaly_investigation": investigation.model_dump(mode="json"),
             "recent_open_incidents": [
                 item.model_dump(mode="json") for item in recent_incidents
@@ -89,7 +96,15 @@ class IncidentReviewer:
                         "Reviewer proposed updates outside the supplied 24-hour context: "
                         f"{sorted(invalid_ids)}"
                     )
-                return IncidentReviewerResult(result=decision, steps_used=step - 1)
+                return IncidentReviewerResult(
+                    result=self._timestamp_decision(
+                        decision,
+                        recent_incidents,
+                        observation_window_start,
+                        observation_window_end,
+                    ),
+                    steps_used=step - 1,
+                )
             outputs = []
             for call in calls:
                 try:
@@ -120,4 +135,36 @@ class IncidentReviewer:
         return IncidentReviewerResult(
             result=IncidentReviewDecision(new_incidents=[], updated_incidents=[]),
             steps_used=max_steps,
+        )
+
+    @staticmethod
+    def _timestamp_decision(
+        decision: IncidentReviewDecision,
+        recent_incidents: list[RecentIncident],
+        observation_window_start: datetime,
+        observation_window_end: datetime,
+    ) -> IncidentReviewDecision:
+        """Apply timestamps from the shared observation window, not model inference."""
+        existing_started_at = {
+            incident.incident_id: incident.started_at for incident in recent_incidents
+        }
+        return IncidentReviewDecision(
+            new_incidents=[
+                proposal.model_copy(
+                    update={
+                        "started_at": observation_window_start,
+                        "last_seen_at": observation_window_end,
+                    }
+                )
+                for proposal in decision.new_incidents
+            ],
+            updated_incidents=[
+                proposal.model_copy(
+                    update={
+                        "started_at": existing_started_at[proposal.incident_id],
+                        "last_seen_at": observation_window_end,
+                    }
+                )
+                for proposal in decision.updated_incidents
+            ],
         )

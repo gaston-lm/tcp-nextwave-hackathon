@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -50,11 +51,22 @@ class AnomalyDetector:
         raise ValueError(f"Unsupported tool: {name}")
 
     @traced_agent("anomaly_detector")
-    async def detect(self, max_steps: int) -> PaymentAnomalyDetectionResult:
+    async def detect(
+        self,
+        observation_window_start: datetime,
+        observation_window_end: datetime,
+        max_steps: int,
+    ) -> PaymentAnomalyDetectionResult:
         response = await self.client.responses.create(
             model=self.model,
             instructions=PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS,
-            input="Investigate the latest completed five-minute window. Begin with the overview.",
+            input=(
+                "Investigate the completed five-minute payment window "
+                f"[{observation_window_start.isoformat()}, "
+                f"{observation_window_end.isoformat()}). This is the canonical "
+                "observation window shared by all Control Tower agents. Begin with "
+                "the overview."
+            ),
             tools=PAYMENT_ANOMALY_DETECTION_TOOLS,
             text=response_format("anomaly_investigation", AnomalyInvestigation),
             # The first observation is mandatory and deterministic. Subsequent

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .agents import ActionTaker, AnomalyDetector, IncidentReviewer
@@ -40,7 +42,10 @@ class TowerControlAgent:
 
     @traced_chain("tower_control_agent")
     async def investigate(
-        self, max_steps: int
+        self,
+        observation_window_start: datetime,
+        observation_window_end: datetime,
+        max_steps: int,
     ) -> tuple[
         PaymentAnomalyDetectionResult,
         IncidentReviewerResult,
@@ -51,11 +56,15 @@ class TowerControlAgent:
         detection = await AnomalyDetector(
             self.metrics,
             settings=self.settings,
-        ).detect(max_steps)
+        ).detect(observation_window_start, observation_window_end, max_steps)
         repository = IncidentRepository(self.session_factory)
         recent_incidents = await repository.recent_open_incidents()
         review = await IncidentReviewer(repository, settings=self.settings).review(
-            detection.result, recent_incidents, max_steps
+            detection.result,
+            recent_incidents,
+            observation_window_start,
+            observation_window_end,
+            max_steps,
         )
         persisted = await IncidentWriter(self.session_factory).apply(review.result)
         new_incidents = await repository.new_incidents(persisted.created_incident_ids)

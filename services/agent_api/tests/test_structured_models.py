@@ -4,13 +4,16 @@ import pytest
 from pydantic import ValidationError
 
 from services.agent_api.app.agents.action_taker import ActionTaker
+from services.agent_api.app.agents.incident_reviewer import IncidentReviewer
 from services.agent_api.app.incidents import normalized_dimension_signatures
+from services.agent_api.app.metrics import MetricsService
 from services.agent_api.app.models.anomaly_detection import (
     ActionableIncident,
     ActionProposal,
     AnomalyInvestigation,
     DimensionSignatures,
     IncidentReviewDecision,
+    RecentIncident,
     UpdatedIncidentProposal,
 )
 from services.agent_api.app.structured_output import parse_output, response_format
@@ -173,3 +176,49 @@ def test_sparse_database_signature_is_normalized_for_strict_agent_models():
         "country": None,
         "issuing_bank": None,
     }
+
+
+def test_metrics_exposes_a_timezone_aware_observation_window():
+    metrics = MetricsService(
+        pool=None,
+        as_of=datetime(2026, 8, 30, 3, 7, 40, tzinfo=UTC),
+    )
+
+    assert metrics.observation_window_start == datetime(2026, 8, 30, 3, 0, tzinfo=UTC)
+    assert metrics.observation_window_end == datetime(2026, 8, 30, 3, 5, tzinfo=UTC)
+
+
+def test_reviewer_derives_proposal_timestamps_from_observation_window():
+    original_started_at = datetime(2026, 8, 30, 2, 30, tzinfo=UTC)
+    window_start = datetime(2026, 8, 30, 3, 0, tzinfo=UTC)
+    window_end = datetime(2026, 8, 30, 3, 5, tzinfo=UTC)
+    decision = IncidentReviewDecision.model_validate(
+        {
+            "new_incidents": [proposal()],
+            "updated_incidents": [{"incident_id": 7, **proposal()}],
+        }
+    )
+    recent_incident = RecentIncident.model_validate(
+        {
+            "incident_id": 7,
+            "severity": "high",
+            "status": "open",
+            "title": "Acquirer authorization decline",
+            "overview": "Approval rate dropped below its weekday baseline.",
+            "dimension_signatures": signatures(),
+            "estimated_impact": 1200.0,
+            "approval_rate_drop": 12.5,
+            "affected_transaction_count": 40,
+            "started_at": original_started_at,
+            "last_seen_at": original_started_at,
+        }
+    )
+
+    result = IncidentReviewer._timestamp_decision(
+        decision, [recent_incident], window_start, window_end
+    )
+
+    assert result.new_incidents[0].started_at == window_start
+    assert result.new_incidents[0].last_seen_at == window_end
+    assert result.updated_incidents[0].started_at == original_started_at
+    assert result.updated_incidents[0].last_seen_at == window_end
