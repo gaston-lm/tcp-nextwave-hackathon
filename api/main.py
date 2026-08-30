@@ -68,6 +68,47 @@ def list_incidents():
         return [serialize_incident(row) for row in db_cursor.fetchall()]
 
 
+@app.get("/api/dashboard/incidents-today")
+def incidents_today():
+    with cursor() as db_cursor:
+        db_cursor.execute("""
+            SELECT severity, COUNT(*)
+            FROM incidents
+            WHERE started_at >= date_trunc('day', CURRENT_TIMESTAMP)
+              AND started_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
+            GROUP BY severity
+            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END
+        """)
+        by_severity = [{"severity": severity, "count": count} for severity, count in db_cursor.fetchall()]
+    return {"total": sum(item["count"] for item in by_severity), "bySeverity": by_severity}
+
+
+@app.get("/api/dashboard/incidents-this-week")
+def incidents_this_week():
+    with cursor() as db_cursor:
+        db_cursor.execute("""
+            WITH days AS (
+                SELECT generate_series(
+                    date_trunc('week', CURRENT_DATE),
+                    date_trunc('week', CURRENT_DATE) + INTERVAL '6 days',
+                    INTERVAL '1 day'
+                )::date AS day
+            )
+            SELECT days.day, COUNT(incidents.id)
+            FROM days
+            LEFT JOIN incidents
+              ON incidents.started_at >= days.day
+             AND incidents.started_at < days.day + INTERVAL '1 day'
+            GROUP BY days.day
+            ORDER BY days.day
+        """)
+        days = [
+            {"date": day.isoformat(), "label": day.strftime("%a"), "count": count}
+            for day, count in db_cursor.fetchall()
+        ]
+    return {"total": sum(item["count"] for item in days), "days": days}
+
+
 @app.get("/api/incidents/{incident_key}")
 def get_incident(incident_key: str):
     with cursor() as db_cursor:
