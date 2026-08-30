@@ -66,18 +66,14 @@ make ingestion-generator    # http://127.0.0.1:8002
 The Generator continues from one second after the newest stored transaction
 timestamp. It produces one second of timestamps per real second while keeping
 the configured transaction average per minute. The agent analyzes the latest
-completed one-minute window. To run it once per minute during the demo, add the
-following entry with `crontab -e`, replacing the repository path:
-
-```cron
-* * * * * cd /absolute/path/to/repo && .venv/bin/python scripts/agent/run_scheduled_investigation.py >> /tmp/control-tower-agent-scheduler.log 2>&1
-```
-
-The job safely skips when the Generator is stopped. Follow its output with:
+completed one-minute window. To run it every 30 seconds during the demo, start
+the local scheduler in a separate terminal:
 
 ```bash
-tail -f /tmp/control-tower-agent-scheduler.log
+make agent-scheduler
 ```
+
+The scheduler safely skips when the Generator is stopped; stop it with `Ctrl+C`.
 
 ## Repository layout
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import time
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -70,8 +71,22 @@ def main() -> int:
         type=Path,
         default=Path("/tmp/control-tower-agent-scheduler.lock"),
     )
+    parser.add_argument(
+        "--interval-seconds",
+        type=int,
+        help="Run continuously at this real-time interval instead of once.",
+    )
     args = parser.parse_args()
-    return run_once(args)
+
+    if args.interval_seconds is None:
+        return run_once(args)
+    if args.interval_seconds < 1:
+        parser.error("--interval-seconds must be at least 1")
+
+    while True:
+        started_at = time.monotonic()
+        run_once(args)
+        time.sleep(max(0, args.interval_seconds - (time.monotonic() - started_at)))
 
 
 if __name__ == "__main__":

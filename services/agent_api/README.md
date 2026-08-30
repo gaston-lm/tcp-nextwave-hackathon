@@ -119,17 +119,16 @@ Run it once from the repository root with:
 make agent-scheduled-investigation
 ```
 
-For the demo, a local cron entry runs it once per real minute. It requires the
-agent API and Generator UI to be running first. Replace `/absolute/path/to/repo`
-with the clone path:
+For the demo, run a local scheduler process every 30 real seconds. It requires
+the agent API and Generator UI to be running first:
 
-```cron
-* * * * * cd /absolute/path/to/repo && .venv/bin/python scripts/agent/run_scheduled_investigation.py >> /tmp/control-tower-agent-scheduler.log 2>&1
+```sh
+make agent-scheduler
 ```
 
 The scheduler uses the Generator's current timestamp, so each run analyzes the
-latest completed one-minute window. Inspect its output with
-`tail -f /tmp/control-tower-agent-scheduler.log`. It skips a tick when the stream
+latest completed one-minute window. Consecutive ticks can intentionally inspect
+the same completed minute. Stop it with `Ctrl+C`; it skips a tick when the stream
 is stopped or an earlier investigation still holds the lock.
 
 ## Arize AX tracing

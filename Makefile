@@ -4,7 +4,7 @@ LIVE_FILE ?= data/local/transactions.csv
 LIVE_RATE ?= 10
 LOCAL_DATABASE_ENV = env -u DATABASE_URL -u POSTGRES_HOST -u POSTGRES_PORT -u POSTGRES_DB -u POSTGRES_USER -u POSTGRES_PASSWORD
 
-.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingestion-generator ingest-live agent-scheduled-investigation lint
+.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingestion-generator ingest-live agent-scheduled-investigation agent-scheduler lint
 
 db-up:
 	docker compose -f data/docker-compose.yml up -d
@@ -23,6 +23,9 @@ agent-api:
 
 agent-scheduled-investigation:
 	$(PYTHON) scripts/agent/run_scheduled_investigation.py
+
+agent-scheduler:
+	$(PYTHON) scripts/agent/run_scheduled_investigation.py --interval-seconds 30
 
 dashboard:
 	npm --prefix apps/dashboard run dev
