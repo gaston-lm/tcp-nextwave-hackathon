@@ -1,0 +1,17 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.5
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: conventional-commit-message
+        name: Conventional Commit message
+        entry: python scripts/hooks/check_commit_message.py
+        language: system
+        stages: [commit-msg]
+        always_run: true

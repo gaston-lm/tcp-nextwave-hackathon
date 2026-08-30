@@ -1,6 +1,13 @@
 # Control Tower database
 
-This folder owns the shared PostgreSQL schema and local Docker database.
+This directory is the single owner of the shared PostgreSQL schema and local Docker database.
+
+## Contents
+
+- `schemas/` — schema and baseline-metric SQL.
+- `seeds/` — deterministic SQL seed data applied by initialization.
+- `fixtures/` — small committed example datasets.
+- `local/` — ignored large local CSV datasets, such as historical and live transaction files.
 
 ## Start automatically with Docker
 
@@ -25,7 +32,7 @@ an already-running database by loading the historical transaction CSV and calcul
 weekday baseline grains:
 
 ```bash
-python data/init_db.py --history-csv path/to/history.csv
+python scripts/db/init_db.py --history-csv data/local/baseline.csv
 ```
 
 The script applies the schema, inserts the CSV's mapping and transaction rows, then calls
@@ -39,7 +46,7 @@ This removes the local database volume and all of its contents:
 ```bash
 docker compose -f data/docker-compose.yml down -v
 docker compose -f data/docker-compose.yml up -d
-python data/init_db.py --history-csv path/to/history.csv
+python scripts/db/init_db.py --history-csv data/local/baseline.csv
 ```
 
 ## Connect with psql
