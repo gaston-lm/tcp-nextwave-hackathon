@@ -27,14 +27,26 @@ make dashboard      # Vite development server
 
 ## Repository layout
 
-- `apps/dashboard/` — React dashboard.
-- `services/dashboard_api/` — FastAPI API consumed by the dashboard.
-- `services/agent_api/` — FastAPI API and multi-agent investigation workflow.
-- `data/` — PostgreSQL Compose configuration, schema, seeds, fixtures, and database initialization.
-- `scripts/` — database initialization, historical loading, and live transaction replay utilities.
-- `docs/` — challenge and product documentation.
-
-Each component has its own README with setup and usage details.
+```text
+.
+├── apps/
+│   └── dashboard/              # React/Vite dashboard
+├── services/
+│   ├── dashboard_api/          # Dashboard FastAPI API (port 8000)
+│   └── agent_api/              # Agent orchestration FastAPI API (port 8001)
+├── data/
+│   ├── schemas/                # PostgreSQL schema definitions
+│   ├── seeds/                  # Deterministic SQL seed data
+│   ├── fixtures/               # Small committed example datasets
+│   ├── local/                  # Ignored local CSV datasets
+│   └── docker-compose.yml
+├── scripts/
+│   ├── db/init_db.py           # Schema, history, and baseline initialization
+│   └── ingestion/              # History load, live replay, and status scripts
+├── docs/                       # Challenge documentation and decision log
+├── Makefile                    # Local development commands
+└── requirements-dev.txt        # Shared development tooling
+```
 
 ## Developer checks
 
