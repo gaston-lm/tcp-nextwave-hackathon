@@ -17,6 +17,7 @@ app.add_middleware(
         "https://frontend-eta-one-42.vercel.app",
         "https://frontend-bfizk72dq-tcp10.vercel.app",
     ],
+    allow_origin_regex=r"https://control-tower-[a-z0-9]+-tcp10\.vercel\.app",
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
