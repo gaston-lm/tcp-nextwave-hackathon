@@ -47,13 +47,13 @@ NextWave Hackathon 2026 · Buenos Aires
 
 **Options considered**
 
-- Check one day's worth of data, or count transactions instead?
+- Check every X amount of time, or count transactions instead?
 - With low traffic, a time window might not have enough data
 - But counting transactions could take forever to fill up
 
-**Chosen:** Time window (1 day, evaluated every 5 minutes)
+**Chosen:** Time window evaluated every 5 minutes
 
-**Why:** One day of data checked every 5 minutes gives us a good view of what's happening without making the system slow. It's a nice middle ground for an MVP.
+**Why:** The data being checked every 5 minutes gives us a good view of what's happening without making the system slow. It's a nice middle ground for an MVP.
 
 ---
 
@@ -79,9 +79,10 @@ NextWave Hackathon 2026 · Buenos Aires
 - Could look at merchant, provider, country, payment method, time of day, day of week, etc.
 - More detail = slower and more complicated, but more accurate
 
-**Chosen:** Merchant-based baseline with a one-day historical window, refreshed every five minutes.
+**Chosen:** Merchant-based baseline with a day of the week historical window, refreshed every five minutes.
 
 **Why:** Looking at each merchant separately keeps things fast and simple for now. Later we can add more details if we need to, like breaking it down by country or time of day. For the data generation, we used Codex to help pick the probabilities, but we reviewed them ourselves to make sure they made sense. For example, wallet payments have an offset that makes declines less likely.
+
 ---
 
 ## 7. Go back in time `T+04:15`
