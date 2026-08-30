@@ -71,6 +71,29 @@ class IncidentReviewerResult(StrictModel):
     steps_used: int = Field(ge=0)
 
 
+class ActionableIncident(StrictModel):
+    incident_id: int = Field(gt=0)
+    title: str
+    overview: str
+    dimension_signatures: DimensionSignatures
+    related_deployment_ids: list[str]
+
+
+class ActionProposal(StrictModel):
+    incident_id: int = Field(gt=0)
+    action_type: Literal[
+        "deploy_rollback",
+        "recommend_switch_provider_to_merchant",
+        "post_slack_alert_to_channel",
+    ]
+    action_details: str = Field(min_length=1)
+
+
+class ActionTakerResult(StrictModel):
+    result: ActionProposal
+    steps_used: int = Field(ge=0)
+
+
 class RecentIncident(StrictModel):
     incident_id: int
     severity: Literal["urgent", "high", "medium", "low"]

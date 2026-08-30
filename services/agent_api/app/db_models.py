@@ -68,6 +68,31 @@ class IncidentMemory(Base):
     )
 
 
+class IncidentAction(Base):
+    __tablename__ = "incidents_actions"
+
+    action_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incidents.incident_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    action_details: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "action_type IN ("
+            "'deploy_rollback', "
+            "'recommend_switch_provider_to_merchant', "
+            "'post_slack_alert_to_channel'"
+            ")"
+        ),
+    )
+
+
 class DeploymentLog(Base):
     __tablename__ = "deployment_logs"
 

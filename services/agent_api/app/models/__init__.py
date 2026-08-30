@@ -1,6 +1,9 @@
 """Typed API and agent-domain models for the Control Tower service."""
 
 from .anomaly_detection import (
+    ActionableIncident,
+    ActionProposal,
+    ActionTakerResult,
     AnomalyInvestigation,
     DimensionSignatures,
     IncidentProposal,
@@ -10,6 +13,7 @@ from .anomaly_detection import (
     RecentIncident,
 )
 from .investigation import (
+    ActionPersistence,
     IncidentPersistence,
     InvestigationRequest,
     InvestigationResponse,
@@ -19,7 +23,11 @@ __all__ = [
     "InvestigationRequest",
     "InvestigationResponse",
     "IncidentPersistence",
+    "ActionPersistence",
     "AnomalyInvestigation",
+    "ActionProposal",
+    "ActionTakerResult",
+    "ActionableIncident",
     "DimensionSignatures",
     "IncidentProposal",
     "IncidentReviewDecision",

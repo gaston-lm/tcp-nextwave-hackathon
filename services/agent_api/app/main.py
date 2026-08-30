@@ -48,7 +48,13 @@ async def investigate(
         payload.as_of,
     )
     try:
-        detection, reviewer, persistence = await TowerControlAgent(
+        (
+            detection,
+            reviewer,
+            persistence,
+            actions,
+            action_persistence,
+        ) = await TowerControlAgent(
             metrics, request.app.state.session_factory
         ).investigate(payload.max_steps)
     except OpenAIError as error:
@@ -66,5 +72,10 @@ async def investigate(
         persistence={
             "created_incident_ids": persistence.created_incident_ids,
             "updated_incident_ids": persistence.updated_incident_ids,
+        },
+        action_taker=actions,
+        action_persistence={
+            "action_ids": action_persistence.action_ids,
+            "action_types": action_persistence.action_types,
         },
     )

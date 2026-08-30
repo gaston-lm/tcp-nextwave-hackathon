@@ -35,3 +35,9 @@ incidents in `data/seeds/dashboard_mock.sql`. The dashboard uses those records
 to show read/unread tabs, severity slices for today's chart, and week-to-date
 incident counts. The sample seed is idempotent, so it can safely be re-run
 during local development.
+
+When ActionTaker has recorded actions in `incidents_actions`, incident list and detail
+responses include them in `actions`. Each item contains `actionType`, `actionDetails`, and
+`createdAt`. The legacy latest-action fields (`agentAction`, `agentActionType`, and
+`agentActionAt`) remain available. These are operator-facing drafts; the dashboard API does
+not send Slack messages or contact payment providers.

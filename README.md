@@ -56,7 +56,7 @@ make dashboard      # Vite development server
 
 ## Incident workflow
 
-The agent API runs a two-stage incident workflow:
+The agent API runs a three-stage incident workflow:
 
 1. `AnomalyDetector` analyzes the latest completed five-minute payment window and returns a
    strict JSON Schema result.
@@ -64,8 +64,11 @@ The agent API runs a two-stage incident workflow:
    uses semantic searches over closed-incident memory and payment deployment logs.
 3. A deterministic SQLAlchemy persistence stage—not an agent—creates new incidents and applies
    complete updates to existing ones in a transaction.
+4. `ActionTaker` runs only for newly created incidents. It records one draft-only operational
+   action per incident: deployment rollback guidance takes priority, then a merchant-approved
+   provider-switch recommendation with provider-escalation draft, then a shared Slack alert draft.
 
-Incident, incident-memory, and deployment-log persistence use SQLAlchemy models. Analytical
+Incident, incident-memory, deployment-log, and incident-action persistence use SQLAlchemy models. Analytical
 transaction/baseline queries remain parameterized read-only metric queries. The investigation API
 response includes the detector result, reviewer proposals, and the IDs committed by persistence.
 

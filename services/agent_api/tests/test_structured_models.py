@@ -3,7 +3,11 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
+from services.agent_api.app.agents.action_taker import ActionTaker
+from services.agent_api.app.incidents import normalized_dimension_signatures
 from services.agent_api.app.models.anomaly_detection import (
+    ActionableIncident,
+    ActionProposal,
     AnomalyInvestigation,
     DimensionSignatures,
     IncidentReviewDecision,
@@ -76,3 +80,96 @@ def test_parse_output_rejects_unknown_top_level_property():
             IncidentReviewDecision,
             '{"new_incidents": [], "updated_incidents": [], "extra": true}',
         )
+
+
+def test_action_proposal_rejects_unknown_action_type():
+    with pytest.raises(ValidationError):
+        ActionProposal.model_validate(
+            {
+                "incident_id": 7,
+                "action_type": "send_provider_email",
+                "action_details": "Draft message",
+            }
+        )
+
+
+def test_action_proposal_requires_operator_guidance():
+    with pytest.raises(ValidationError):
+        ActionProposal.model_validate(
+            {
+                "incident_id": 7,
+                "action_type": "deploy_rollback",
+                "action_details": "",
+            }
+        )
+
+
+def actionable_incident(**overrides):
+    return ActionableIncident.model_validate(
+        {
+            "incident_id": 7,
+            "title": "Authorization declines",
+            "overview": "Approval rates fell.",
+            "dimension_signatures": signatures(merchant="Merchant A"),
+            "related_deployment_ids": [],
+            **overrides,
+        }
+    )
+
+
+def action_proposal(action_type, details):
+    return ActionProposal(
+        incident_id=7, action_type=action_type, action_details=details
+    )
+
+
+def test_action_taker_requires_deployment_rollback_before_other_actions():
+    incident = actionable_incident(related_deployment_ids=["deploy-123"])
+    with pytest.raises(ValueError, match="require rollback"):
+        ActionTaker.validate_proposal(
+            incident,
+            action_proposal("post_slack_alert_to_channel", "Draft Slack alert"),
+            ["Provider B"],
+        )
+    ActionTaker.validate_proposal(
+        incident,
+        action_proposal("deploy_rollback", "Investigate rollback of deploy-123."),
+        ["Provider B"],
+    )
+
+
+def test_action_taker_requires_approved_provider_switch_when_available():
+    incident = actionable_incident()
+    with pytest.raises(ValueError, match="require a switch"):
+        ActionTaker.validate_proposal(
+            incident,
+            action_proposal("post_slack_alert_to_channel", "Draft Slack alert"),
+            ["Provider B"],
+        )
+    ActionTaker.validate_proposal(
+        incident,
+        action_proposal(
+            "recommend_switch_provider_to_merchant",
+            "Recommend Provider B; draft provider escalation.",
+        ),
+        ["Provider B"],
+    )
+
+
+def test_action_taker_falls_back_to_slack_without_provider_alternatives():
+    incident = actionable_incident()
+    ActionTaker.validate_proposal(
+        incident,
+        action_proposal("post_slack_alert_to_channel", "Draft Slack alert"),
+        [],
+    )
+
+
+def test_sparse_database_signature_is_normalized_for_strict_agent_models():
+    assert normalized_dimension_signatures({"provider": "MercadoPago"}) == {
+        "merchant": None,
+        "provider": "MercadoPago",
+        "payment_method": None,
+        "country": None,
+        "issuing_bank": None,
+    }
