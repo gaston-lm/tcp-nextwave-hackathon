@@ -1,12 +1,19 @@
 ![crew_card](docs/img/crew-card.png)
 
-### TCP Group - Nextwave Hackathon 2026 by Yuno x Nauta
+## Architecture
 
-TCP's repository for Nextwave Hackathon 2026 by Yuno x Nauta 
+The [high-level architecture](ARCHITECTURE.md) shows the Control Tower components and their
+database boundary. `TowerControlAgent` is the multi-agent orchestration that reads investigation
+context and writes operational records; its detailed agent-and-tool flow is documented in the
+[Agent API README](services/agent_api/README.md#orchestration).
 
-Challange 2: The Control Tower
+Component documentation:
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level product architecture.
+- [Transaction Generator](scripts/ingestion/generator/README.md)
+- [PostgreSQL data layer](data/README.md)
+- [Dashboard API](services/dashboard_api/README.md)
+- [Dashboard](apps/dashboard/README.md)
+- [Agent API](services/agent_api/README.md)
 
 ## Local development
 
@@ -34,6 +41,9 @@ make dashboard      # Vite development server
 
 ## Repository layout
 
+**Core system:** `services/agent_api/app/` contains the TowerControlAgent multi-agent
+orchestration and its specialist agents.
+
 ```text
 .
 ├── apps/
@@ -41,6 +51,7 @@ make dashboard      # Vite development server
 ├── services/
 │   ├── dashboard_api/          # Dashboard FastAPI API (port 8000)
 │   └── agent_api/              # Agent orchestration FastAPI API (port 8001)
+│       └── app/                # TowerControlAgent and specialist agent application
 ├── data/
 │   ├── db_migrations/          # Ordered, versioned database changes
 │   ├── schemas/                # Transaction and baseline schema definitions
@@ -58,7 +69,7 @@ make dashboard      # Vite development server
 
 ## Incident workflow
 
-The agent API runs a three-stage incident workflow:
+`TowerControlAgent` coordinates the incident workflow:
 
 1. `AnomalyDetector` analyzes the latest completed five-minute payment window and returns a
    strict JSON Schema result.
@@ -69,6 +80,10 @@ The agent API runs a three-stage incident workflow:
 4. `ActionTaker` runs only for newly created incidents. It records one draft-only operational
    action per incident: deployment rollback guidance takes priority, then a merchant-approved
    provider-switch recommendation with provider-escalation draft, then a shared Slack alert draft.
+
+The [Agent API README](services/agent_api/README.md#orchestration) shows each agent's tools and
+database context. The dashboard mock seed includes incidents and ActionTaker drafts only; it does
+not include transactions or baseline metrics.
 
 Incident, incident-memory, deployment-log, and incident-action persistence use SQLAlchemy models. Analytical
 transaction/baseline queries remain parameterized read-only metric queries. The investigation API
