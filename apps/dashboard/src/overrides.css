@@ -25,9 +25,9 @@ header { justify-content: initial; }
   margin-bottom: 24px;
 }
 
-.overview-card h3,
-.actions-taken h3 {
-  font-size: 18px;
+.overview-card h2,
+.actions-taken h2 {
+  font-size: 25px;
   margin-bottom: 8px;
 }
 
@@ -37,6 +37,33 @@ header { justify-content: initial; }
 
 .actions-taken h3 {
   font-size: 21px;
+}
+
+.action-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.action-list li {
+  padding-left: 3px;
+}
+
+.action-list strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.action-list p {
+  color: #62626e;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.facts .accent {
+  color: #dc2626;
 }
 
 .incident-tabs {
@@ -81,9 +108,41 @@ header { justify-content: initial; }
 }
 
 .transaction-trend-panel {
-  margin-bottom: 18px;
   padding: 25px;
   overflow: hidden;
+}
+
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.dashboard-kpis {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 25px;
+}
+
+.dashboard-kpi {
+  background: #f6f6f8;
+  border-radius: 9px;
+  padding: 16px;
+}
+
+.dashboard-kpi span,
+.dashboard-kpi small {
+  color: #73737f;
+  display: block;
+  font-size: 11px;
+}
+
+.dashboard-kpi strong {
+  display: block;
+  font-size: 24px;
+  margin: 7px 0 4px;
 }
 
 .transaction-chart-meta {
@@ -152,4 +211,8 @@ header { justify-content: initial; }
 @media (max-width: 520px) {
   .transaction-trend-panel { padding: 20px; }
   .transaction-trend-panel .panel-heading { align-items: flex-start; gap: 12px; flex-direction: column; }
+}
+
+@media (max-width: 900px) {
+  .dashboard-summary { grid-template-columns: 1fr; }
 }
