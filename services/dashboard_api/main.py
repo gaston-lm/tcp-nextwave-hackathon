@@ -55,11 +55,14 @@ def serialize_incident(row):
         "estimatedImpact": row[6],
         "approvalRateDrop": row[7],
         "affectedTransactions": row[8],
+        "relatedIncidentIds": row[12] or [],
+        "relatedDeploymentIds": row[13] or [],
         "agentAction": None,
         "agentActionAt": None,
         "startedAt": row[9],
         "lastSeenAt": row[10],
         "isRead": row[11],
+        "createdAt": row[14],
     }
 
 
@@ -75,7 +78,8 @@ def list_incidents():
     with cursor() as db_cursor:
         db_cursor.execute("""
             SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
-                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
+                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
+                   related_incidents, related_deployments, created_at
             FROM incidents ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
         """)
         return [serialize_incident(row) for row in db_cursor.fetchall()]
@@ -87,8 +91,8 @@ def incidents_today():
         db_cursor.execute("""
             SELECT incident_id, severity
             FROM incidents
-            WHERE started_at >= date_trunc('day', CURRENT_TIMESTAMP)
-              AND started_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
+            WHERE created_at >= date_trunc('day', CURRENT_TIMESTAMP)
+              AND created_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
             ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, incident_id
         """)
         by_incident_key = [
@@ -105,15 +109,18 @@ def incidents_this_week():
             WITH days AS (
                 SELECT generate_series(
                     date_trunc('week', CURRENT_DATE),
-                    date_trunc('week', CURRENT_DATE) + INTERVAL '6 days',
+                    LEAST(
+                        date_trunc('week', CURRENT_DATE) + INTERVAL '6 days',
+                        CURRENT_DATE::timestamp
+                    ),
                     INTERVAL '1 day'
                 )::date AS day
             )
             SELECT days.day, COUNT(incidents.incident_id)
             FROM days
             LEFT JOIN incidents
-              ON incidents.started_at >= days.day
-             AND incidents.started_at < days.day + INTERVAL '1 day'
+              ON incidents.created_at >= days.day
+             AND incidents.created_at < days.day + INTERVAL '1 day'
             GROUP BY days.day
             ORDER BY days.day
         """)
@@ -124,13 +131,52 @@ def incidents_this_week():
     return {"total": sum(item["count"] for item in days), "days": days}
 
 
+@app.get("/api/dashboard/transaction-trend")
+def transaction_trend():
+    """Return total and failed transaction counts for the latest 12 simulated hours."""
+    with cursor() as db_cursor:
+        db_cursor.execute("""
+            WITH anchor AS (
+                SELECT COALESCE(date_trunc('hour', MAX(issued_timestamp)), date_trunc('hour', CURRENT_TIMESTAMP)) AS hour
+                FROM transactions
+            ), hours AS (
+                SELECT generate_series(
+                    anchor.hour - INTERVAL '11 hours', anchor.hour, INTERVAL '1 hour'
+                ) AS hour
+                FROM anchor
+            )
+            SELECT
+                hours.hour,
+                COUNT(transactions.transaction_id) AS attempts,
+                COUNT(transactions.transaction_id) FILTER (WHERE transactions.is_declined IS TRUE) AS failed
+            FROM hours
+            LEFT JOIN transactions
+              ON transactions.issued_timestamp >= hours.hour
+             AND transactions.issued_timestamp < hours.hour + INTERVAL '1 hour'
+            GROUP BY hours.hour
+            ORDER BY hours.hour
+        """)
+        days = []
+        for hour, attempts, failed in db_cursor.fetchall():
+            days.append(
+                {
+                    "date": hour.isoformat(),
+                    "label": hour.strftime("%H:%M"),
+                    "attempts": attempts,
+                    "failed": failed,
+                }
+            )
+    return {"days": days}
+
+
 @app.get("/api/incidents/{incident_id}")
 def get_incident(incident_id: int):
     with cursor() as db_cursor:
         db_cursor.execute(
             """
             SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
-                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
+                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
+                   related_incidents, related_deployments, created_at
             FROM incidents WHERE incident_id = %s
         """,
             (incident_id,),
@@ -150,7 +196,8 @@ def update_incident_read_status(incident_id: int, update: IncidentReadUpdate):
             SET is_read = %s
             WHERE incident_id = %s
             RETURNING incident_id, title, severity, status, overview, dimension_signatures::text,
-                      estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
+                      estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read,
+                      related_incidents, related_deployments, created_at
         """,
             (update.is_read, incident_id),
         )

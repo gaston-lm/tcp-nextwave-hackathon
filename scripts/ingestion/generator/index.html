@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live ingestion control</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; background: #f5f5f7; color: #202027; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 48px 18px; }
+    main { max-width: 780px; margin: auto; }
+    .eyebrow { margin: 0 0 8px; color: #d81787; font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+    h1, h2, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: 38px; letter-spacing: -1.5px; }
+    .intro { max-width: 620px; color: #62626e; line-height: 1.55; }
+    .card { margin-top: 20px; padding: 26px; background: #fff; border: 1px solid #e2e2e7; border-radius: 14px; box-shadow: 0 4px 16px #20202708; }
+    .card-head, .control-row, .actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    h2 { margin-bottom: 5px; font-size: 20px; }
+    .card-head p, .control-row p { margin-bottom: 0; color: #777783; font-size: 13px; line-height: 1.5; }
+    .actions { justify-content: flex-start; margin-top: 22px; }
+    .live-volume { display: flex; align-items: end; gap: 12px; margin-top: 20px; }
+    .live-volume .field { width: 220px; }
+    button { border: 0; border-radius: 9px; padding: 11px 17px; font: 700 14px Arial, sans-serif; cursor: pointer; }
+    #start-live { background: #00868c; color: #fff; }
+    #stop-live { border: 1px solid #e2e2e7; background: #f6f6f8; color: #202027; }
+    button:disabled, input:disabled + .slider { cursor: not-allowed; opacity: .5; }
+    #status { display: block; min-height: 18px; margin: 17px 0 0; color: #62626e; font-size: 12px; }
+    #status.running { color: #00868c; }
+    #status.error { color: #c20068; }
+    .controls { padding-top: 10px; }
+    .control-row { padding: 20px 0; border-top: 1px solid #ececf0; }
+    .control-row h2 { font-size: 16px; }
+    .control-row.global h2 { color: #c20068; }
+    .switch { position: relative; display: inline-block; flex: 0 0 auto; width: 58px; height: 32px; }
+    .switch input { width: 0; height: 0; opacity: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; border-radius: 999px; background: #d7d7df; transition: .2s; }
+    .slider:before { content: ''; position: absolute; width: 24px; height: 24px; left: 4px; bottom: 4px; border-radius: 50%; background: #fff; transition: .2s; box-shadow: 0 1px 3px #20202733; }
+    .switch input:checked + .slider { background: #d81787; }
+    .mercadopago .switch input:checked + .slider { background: #00aeb6; }
+    .bancoestado .switch input:checked + .slider { background: #e08a00; }
+    .switch input:checked + .slider:before { transform: translateX(26px); }
+    .switch input:focus-visible + .slider { outline: 2px solid #202027; outline-offset: 3px; }
+    .note { margin: 4px 0 0; color: #777783; font-size: 12px; }
+    details { margin-top: 20px; padding: 22px 26px; background: #fff; border: 1px solid #e2e2e7; border-radius: 14px; box-shadow: 0 4px 16px #20202708; }
+    summary { cursor: pointer; color: #915ee9; font-weight: 700; font-size: 17px; }
+    .advanced-copy { margin: 12px 0 20px; color: #62626e; font-size: 13px; }
+    .advanced-grid { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 14px; }
+    .field label { display: block; margin-bottom: 6px; color: #62626e; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    input, select { width: 100%; padding: 10px 11px; border: 1px solid #e2e2e7; border-radius: 8px; background: #fff; color: #202027; font: 14px Arial, sans-serif; }
+    .provider-rates { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+    .provider-rate { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f7f7f9; border-radius: 9px; }
+    .provider-rate label { flex: 1; font-size: 13px; font-weight: 700; }
+    .provider-rate input { width: 86px; }
+    .rule-form { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ececf0; }
+    .rule-list { display: grid; gap: 8px; margin-top: 14px; }
+    .rule-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 8px; background: #fff0f8; color: #9e0c61; font-size: 12px; }
+    .rule-item button, .secondary { border: 1px solid #e2e2e7; background: #fff; color: #202027; padding: 8px 10px; font-size: 12px; }
+    .advanced-actions { margin-top: 20px; }
+    #apply-advanced { background: #915ee9; color: #fff; }
+    @media (max-width: 560px) { body { padding: 32px 16px; } .card { padding: 20px; } .card-head, .control-row { align-items: flex-start; } .actions { flex-wrap: wrap; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Control Tower · Live simulation</p>
+    <h1>Live ingestion control</h1>
+    <p class="intro">Start the accelerated payment feed, then activate a preselected incident scenario when you want the failed-transactions chart to react.</p>
+
+    <section class="card">
+      <div class="card-head"><div><h2>Live stream</h2><p>One real second represents one simulated minute.</p></div></div>
+      <div class="live-volume"><div class="field"><label for="live-rows">Transactions / simulated minute</label><input id="live-rows" type="number" min="1" step="1"></div><p class="note">Average per real second</p></div>
+      <div class="actions"><button id="start-live" type="button">Start live streaming</button><button id="stop-live" type="button">Stop live streaming</button></div>
+      <span id="status">Loading stream status…</span>
+    </section>
+
+    <section class="card controls">
+      <div class="control-row global">
+        <div><h2>Global failure spike</h2><p>Creates an 85% decline baseline for every provider.</p></div>
+        <label class="switch" title="Toggle global failure spike"><input id="global-spike" type="checkbox" role="switch" aria-label="Enable global failure spike"><span class="slider"></span></label>
+      </div>
+      <div class="control-row mercadopago">
+        <div><h2>Break MercadoPago</h2><p>Creates an 85% decline baseline for MercadoPago only.</p></div>
+        <label class="switch" title="Toggle MercadoPago failure spike"><input id="mercadopago-spike" type="checkbox" role="switch" aria-label="Enable MercadoPago failure spike"><span class="slider"></span></label>
+      </div>
+      <div class="control-row bancoestado">
+        <div><h2>Break BancoEstado in Chile</h2><p>Raises declines for BancoEstado transactions in Chile only.</p></div>
+        <label class="switch" title="Toggle BancoEstado Chile failure spike"><input id="bancoestado-spike" type="checkbox" role="switch" aria-label="Enable BancoEstado Chile failure spike"><span class="slider"></span></label>
+      </div>
+      <p class="note">Only one scenario can be active at a time. Changes apply from the next simulated minute.</p>
+    </section>
+
+    <details>
+      <summary>Advanced settings</summary>
+      <p class="advanced-copy">Edit the live generator profile directly. These settings are applied from the next simulated minute and replace any active preset.</p>
+      <div class="advanced-grid">
+        <div class="field"><label for="simulated-start">Simulated start</label><input id="simulated-start" type="datetime-local" step="60"></div>
+      </div>
+      <div id="provider-rates" class="provider-rates"></div>
+      <form id="rule-form" class="rule-form">
+        <div class="field"><label>Provider</label><select name="provider" required></select></div>
+        <div class="field"><label>Country</label><select name="country"></select></div>
+        <div class="field"><label>Merchant</label><select name="merchant"></select></div>
+        <div class="field"><label>Method</label><select name="method"></select></div>
+        <div class="field"><label>Issuing bank</label><select name="issuing_bank"></select></div>
+        <div class="field"><label>Decline code</label><select name="decline_code" required></select></div>
+        <div class="field"><label>Decline increase (%)</label><input name="decline_increase" type="number" min="0.01" max="100" step="0.01" value="1" required></div>
+        <div class="field"><label>&nbsp;</label><button class="secondary" type="submit">Add incident rule</button></div>
+      </form>
+      <div id="rule-list" class="rule-list"></div>
+      <div class="advanced-actions"><button id="apply-advanced" type="button">Apply advanced live settings</button></div>
+    </details>
+  </main>
+
+  <script>
+    const startButton = document.querySelector('#start-live');
+    const stopButton = document.querySelector('#stop-live');
+    const globalToggle = document.querySelector('#global-spike');
+    const mercadoPagoToggle = document.querySelector('#mercadopago-spike');
+    const bancoEstadoToggle = document.querySelector('#bancoestado-spike');
+    const status = document.querySelector('#status');
+    const liveRowsInput = document.querySelector('#live-rows');
+    const simulatedStartInput = document.querySelector('#simulated-start');
+    const providerRatesContainer = document.querySelector('#provider-rates');
+    const ruleForm = document.querySelector('#rule-form');
+    const ruleList = document.querySelector('#rule-list');
+    const applyAdvancedButton = document.querySelector('#apply-advanced');
+    let config = null;
+    let stream = null;
+    let rules = [];
+
+    function setStatus(message, kind = '') { status.textContent = message; status.className = kind; }
+    function renderStatus(nextStream) {
+      stream = nextStream;
+      const running = stream.running && !stream.stopping;
+      startButton.disabled = stream.running;
+      stopButton.disabled = !stream.running || stream.stopping;
+      globalToggle.disabled = !running;
+      mercadoPagoToggle.disabled = !running;
+      bancoEstadoToggle.disabled = !running;
+      globalToggle.checked = stream.scenario === 'failure_spike';
+      mercadoPagoToggle.checked = stream.scenario === 'mercadopago_spike';
+      bancoEstadoToggle.checked = stream.scenario === 'chile_bancoestado_spike';
+      if (stream.last_error) return setStatus(`Stream stopped: ${stream.last_error}`, 'error');
+      if (stream.stopping) return setStatus('Stopping after the current simulated minute…');
+      if (stream.running) return setStatus(`Running · ${stream.inserted_rows.toLocaleString('en-US')} transactions inserted · next simulated minute: ${stream.simulated_timestamp}`, 'running');
+      setStatus(stream.generated_rows ? `Stopped · ${stream.inserted_rows.toLocaleString('en-US')} transactions inserted` : 'Stopped');
+    }
+    async function request(path, payload) {
+      const response = await fetch(path, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: payload ? JSON.stringify(payload) : undefined });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Request failed.');
+      renderStatus(result);
+      return result;
+    }
+    async function startStream() {
+      try {
+        const rowsPerMinute = Number(liveRowsInput.value);
+        if (!Number.isInteger(rowsPerMinute) || rowsPerMinute < 1 || rowsPerMinute > config.max_live_rows_per_minute) throw new Error(`Transactions per minute must be between 1 and ${config.max_live_rows_per_minute.toLocaleString('en-US')}.`);
+        startButton.disabled = true;
+        await request('/api/live/start', { rows_per_minute: rowsPerMinute, start_at: simulatedStartInput.value, provider_rates: collectProviderRates(), rules });
+      }
+      catch (error) { setStatus(error.message, 'error'); startButton.disabled = false; }
+    }
+    async function stopStream() { try { await request('/api/live/stop'); } catch (error) { setStatus(error.message, 'error'); } }
+    async function setScenario(scenario) {
+      const rates = {...config.provider_rates};
+      if (scenario === 'failure_spike') config.providers.forEach(provider => { rates[provider.name] = .85; });
+      if (scenario === 'mercadopago_spike') rates.MercadoPago = .85;
+      const rules = scenario === 'chile_bancoestado_spike'
+        ? config.providers
+          .filter(provider => provider.countries.Chile)
+          .map(provider => ({ provider: provider.name, country: 'Chile', merchant: null, method: null, issuing_bank: 'BancoEstado', decline_increase: .8, decline_code: 51 }))
+        : [];
+      try {
+        globalToggle.disabled = true; mercadoPagoToggle.disabled = true; bancoEstadoToggle.disabled = true;
+        await request('/api/live/config', {provider_rates: rates, rules, scenario});
+      } catch (error) { setStatus(error.message, 'error'); renderStatus(stream); }
+    }
+    startButton.addEventListener('click', startStream);
+    stopButton.addEventListener('click', stopStream);
+    globalToggle.addEventListener('change', () => setScenario(globalToggle.checked ? 'failure_spike' : 'normal'));
+    mercadoPagoToggle.addEventListener('change', () => setScenario(mercadoPagoToggle.checked ? 'mercadopago_spike' : 'normal'));
+    bancoEstadoToggle.addEventListener('change', () => setScenario(bancoEstadoToggle.checked ? 'chile_bancoestado_spike' : 'normal'));
+
+    function addOptions(select, values, any = true) {
+      select.innerHTML = any ? '<option value="">Any</option>' : '';
+      values.forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; select.appendChild(option); });
+    }
+    function renderProviderRates() {
+      providerRatesContainer.innerHTML = '';
+      config.providers.forEach(provider => {
+        const row = document.createElement('div'); row.className = 'provider-rate';
+        row.innerHTML = `<label for="rate-${provider.id}">${provider.name}</label><input id="rate-${provider.id}" data-provider="${provider.name}" type="number" min="0" max="100" step="0.1" value="${(config.provider_rates[provider.name] * 100).toFixed(1)}">`;
+        providerRatesContainer.appendChild(row);
+      });
+    }
+    function collectProviderRates() {
+      const rates = {};
+      providerRatesContainer.querySelectorAll('input').forEach(input => {
+        const percentage = Number(input.value);
+        if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) throw new Error('Provider baselines must be between 0% and 100%.');
+        rates[input.dataset.provider] = percentage / 100;
+      });
+      return rates;
+    }
+    function renderRules() {
+      ruleList.innerHTML = '';
+      rules.forEach((rule, index) => {
+        const row = document.createElement('div'); row.className = 'rule-item';
+        row.innerHTML = `<span>${rule.provider} · ${rule.country || 'Any'} · ${rule.merchant || 'Any'} · ${rule.method || 'Any'} → +${(rule.decline_increase * 100).toFixed(1)}%</span><button type="button">Remove</button>`;
+        row.querySelector('button').addEventListener('click', () => { rules.splice(index, 1); renderRules(); }); ruleList.appendChild(row);
+      });
+    }
+    ruleForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const form = ruleForm.elements;
+      const increase = Number(form.decline_increase.value);
+      if (!Number.isFinite(increase) || increase <= 0 || increase > 100) return setStatus('Decline increase must be between 0% and 100%.', 'error');
+      rules.push({ provider: form.provider.value, country: form.country.value || null, merchant: form.merchant.value || null, method: form.method.value || null, issuing_bank: form.issuing_bank.value || null, decline_code: Number(form.decline_code.value), decline_increase: increase / 100 });
+      renderRules();
+    });
+    applyAdvancedButton.addEventListener('click', async () => {
+      try {
+        if (!stream?.running) throw new Error('Start live streaming before applying advanced settings.');
+        await request('/api/live/config', { provider_rates: collectProviderRates(), rules, scenario: 'normal' });
+        setStatus('Advanced settings will apply from the next simulated minute.', 'running');
+      } catch (error) { setStatus(error.message, 'error'); }
+    });
+    Promise.all([fetch('/api/config').then(response => response.json()), fetch('/api/live/status').then(response => response.json())])
+      .then(([nextConfig, nextStream]) => {
+        config = nextConfig;
+        liveRowsInput.value = config.live_rows_per_minute;
+        liveRowsInput.max = config.max_live_rows_per_minute;
+        simulatedStartInput.value = config.live_start_at.replace(' ', 'T').slice(0, 16);
+        renderProviderRates();
+        const countries = Object.keys(config.providers.flatMap(provider => Object.keys(provider.countries)).reduce((all, country) => ({...all, [country]: true}), {}));
+        const merchants = [...new Set(config.providers.flatMap(provider => Object.values(provider.countries).flatMap(country => country.merchants)))].sort();
+        const methods = [...new Set(config.providers.flatMap(provider => Object.values(provider.countries).flatMap(country => country.methods)))].sort();
+        const banks = [...new Set(config.providers.flatMap(provider => Object.values(provider.countries).flatMap(country => country.banks)))].sort();
+        addOptions(ruleForm.elements.provider, config.providers.map(provider => provider.name), false);
+        addOptions(ruleForm.elements.country, countries); addOptions(ruleForm.elements.merchant, merchants); addOptions(ruleForm.elements.method, methods); addOptions(ruleForm.elements.issuing_bank, banks);
+        addOptions(ruleForm.elements.decline_code, config.decline_codes.map(code => `${code.code}`), false);
+        renderStatus(nextStream);
+        window.setInterval(() => fetch('/api/live/status').then(response => response.json()).then(renderStatus).catch(() => setStatus('Could not load stream status.', 'error')), 1000);
+      })
+      .catch(() => setStatus('Could not load generator configuration.', 'error'));
+  </script>
+</body>
+</html>

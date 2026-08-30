@@ -4,7 +4,7 @@ LIVE_FILE ?= data/local/transactions.csv
 LIVE_RATE ?= 10
 LOCAL_DATABASE_ENV = env -u DATABASE_URL -u POSTGRES_HOST -u POSTGRES_PORT -u POSTGRES_DB -u POSTGRES_USER -u POSTGRES_PASSWORD
 
-.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingest-live lint
+.PHONY: db-up db-down db-init dashboard-api agent-api dashboard ingestion-generator ingest-live lint
 
 db-up:
 	docker compose -f data/docker-compose.yml up -d
@@ -23,6 +23,9 @@ agent-api:
 
 dashboard:
 	npm --prefix apps/dashboard run dev
+
+ingestion-generator:
+	$(PYTHON) scripts/ingestion/generator/app.py
 
 ingest-live:
 	$(PYTHON) scripts/ingestion/stream_ingest.py $(LIVE_FILE) --rows-per-second $(LIVE_RATE)
