@@ -1,6 +1,6 @@
 # Payment transaction ingestion
 
-This folder contains historical CSV loading, simulated live streaming, and PostgreSQL status tools.
+This folder contains historical CSV loading, legacy CSV replay, and PostgreSQL status tools.
 
 ## Setup
 
@@ -42,9 +42,16 @@ python scripts/ingestion/load_history.py data/fixtures/transactions.example.csv 
   --preserve-transaction-ids
 ```
 
-## Simulated live stream
+## Generator-controlled live stream
 
-Replay a CSV at a controlled rate. Before each row is inserted, the loader overwrites its source `issued_timestamp` with the current UTC time so the database behaves like a live feed.
+The current live feed is generated directly by the Generator UI; it does not require a
+CSV. Start the database, run `make ingestion-generator`, and use **Start live ingestion** at
+`http://127.0.0.1:8002`. One real second represents one simulated minute and every
+inserted row retains a timestamp within that simulated minute.
+
+## Legacy CSV replay
+
+Replay a CSV at a controlled rate. Before each row is inserted, the loader overwrites its source `issued_timestamp` with the current UTC time. Use this only for legacy/manual replay; it is not the Generator-controlled live feed.
 
 ```bash
 python scripts/ingestion/stream_ingest.py data/local/transactions.csv --rows-per-second 10 --batch-size 25

@@ -22,6 +22,32 @@ const severityHexColors = {
   low: '#c9c9d0',
 }
 
+const scopeLabels = {
+  provider: 'Provider',
+  country: 'Country',
+  payment_method: 'Payment method',
+  issuing_bank: 'Issuing bank',
+  merchant: 'Merchant',
+}
+
+function formatDateTime(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatApprovalRateDrop(value) {
+  if (value == null) return '—'
+  const percent = Math.abs(value) <= 1 ? value * 100 : value
+  return `${percent.toFixed(percent < 10 ? 1 : 0)}%`
+}
+
+function formatImpact(value) {
+  if (value == null) return '—'
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)
+}
+
 function incidentRingGradient(incidents, total) {
   if (!total) return '#e2e2e7'
 
@@ -34,6 +60,35 @@ function incidentRingGradient(incidents, total) {
   return `conic-gradient(${segments.join(', ')})`
 }
 
+function TransactionTrend({ trend }) {
+  const days = trend?.days || []
+  if (!days.length) return <p className="trend-empty">Loading transaction activity…</p>
+
+  const chartWidth = 960
+  const chartHeight = 244
+  const padding = { top: 24, right: 24, bottom: 34, left: 48 }
+  const max = Math.max(...days.flatMap(day => [day.attempts, day.failed]), 1)
+  const x = index => padding.left + (index * (chartWidth - padding.left - padding.right)) / Math.max(days.length - 1, 1)
+  const y = value => padding.top + (chartHeight - padding.top - padding.bottom) * (1 - value / max)
+  const formatThousands = value => String(Number((value / 1000).toFixed(1)))
+
+  return <>
+    <div className="transaction-chart-meta">
+      <span><i className="failure-key" /> Failed transactions</span>
+      <span><i className="total-key" /> Total transactions</span>
+      <span className="thousands-note">Values in thousands</span>
+    </div>
+    <div className="transaction-chart-scroll">
+      <svg className="transaction-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Twelve hour transaction and failure counts">
+        {[0, .5, 1].map(fraction => <g key={fraction}><line className="chart-grid" x1={padding.left} x2={chartWidth - padding.right} y1={y(max * fraction)} y2={y(max * fraction)} /><text className="chart-axis-label" x={padding.left - 9} y={y(max * fraction) + 4}>{formatThousands(max * fraction)}</text></g>)}
+        {days.slice(0, -1).map((day, index) => <line key={`total-${day.date}`} className="total-segment" x1={x(index)} y1={y(day.attempts)} x2={x(index + 1)} y2={y(days[index + 1].attempts)} />)}
+        {days.slice(0, -1).map((day, index) => <line key={day.date} className="failure-segment" x1={x(index)} y1={y(day.failed)} x2={x(index + 1)} y2={y(days[index + 1].failed)} />)}
+        {days.map((day, index) => <g key={day.date}><circle className="total-dot" cx={x(index)} cy={y(day.attempts)} r="5" /><text className="chart-value total-value" x={x(index)} y={y(day.attempts) - 11}>{formatThousands(day.attempts)}</text><circle className="failure-dot" cx={x(index)} cy={y(day.failed)} r="5" /><text className="chart-value" x={x(index)} y={y(day.failed) - 11}>{formatThousands(day.failed)}</text><text className="chart-label" x={x(index)} y={chartHeight - 9}>{day.label}</text></g>)}
+      </svg>
+    </div>
+  </>
+}
+
 function App() {
   const [issues, setIssues] = useState([])
   const [selected, setSelected] = useState(null)
@@ -41,6 +96,7 @@ function App() {
   const [loadError, setLoadError] = useState(null)
   const [todayMetrics, setTodayMetrics] = useState(null)
   const [weeklyMetrics, setWeeklyMetrics] = useState(null)
+  const [transactionTrend, setTransactionTrend] = useState(null)
   const [activeIncidentTab, setActiveIncidentTab] = useState('unread')
 
   useEffect(() => {
@@ -51,7 +107,7 @@ function App() {
           id: issue.key,
           title: issue.title,
           level: issue.severity[0].toUpperCase() + issue.severity.slice(1),
-          time: `Since ${new Date(issue.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          time: `Detected ${formatDateTime(issue.createdAt)}`,
           volume: `${issue.affectedTransactions.toLocaleString()} affected`,
           ...issue,
         }))
@@ -68,6 +124,16 @@ function App() {
         setSelected(null)
         setLoadError('Unable to load incidents from the Control Tower API.')
       })
+  }, [])
+
+  useEffect(() => {
+    const loadTrend = () => fetch(`${API_BASE_URL}/api/dashboard/transaction-trend`, API_REQUEST_OPTIONS)
+      .then(response => response.ok ? response.json() : Promise.reject(response))
+      .then(setTransactionTrend)
+      .catch(() => setTransactionTrend(null))
+    loadTrend()
+    const poll = window.setInterval(loadTrend, 5000)
+    return () => window.clearInterval(poll)
   }, [])
 
   useEffect(() => {
@@ -110,6 +176,8 @@ function App() {
   const tabIncidents = activeIncidentTab === 'unread' ? unreadIncidents : readIncidents
   const todayIncidentKeys = todayMetrics?.byIncidentKey || []
   const ringGradient = incidentRingGradient(todayIncidentKeys, todayMetrics?.total || 0)
+  const incidentScope = Object.entries(detail?.dimensionSignatures ?? selected?.dimensionSignatures ?? {})
+    .filter(([, value]) => value)
 
   const setIncidentReadStatus = () => {
     if (!selected) return
@@ -127,7 +195,7 @@ function App() {
           id: updated.key,
           title: updated.title,
           level: updated.severity[0].toUpperCase() + updated.severity.slice(1),
-          time: `Since ${new Date(updated.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          time: `Detected ${formatDateTime(updated.createdAt)}`,
           volume: `${updated.affectedTransactions.toLocaleString()} affected`,
           ...updated,
         }
@@ -146,6 +214,11 @@ function App() {
         <h1>Control tower</h1>
       </div>
     </header>
+
+    <section className="panel transaction-trend-panel">
+      <div className="panel-heading"><div><p className="eyebrow">LIVE ACTIVITY · LAST 12 HOURS</p><h2>Failed transactions</h2></div></div>
+      <TransactionTrend trend={transactionTrend} />
+    </section>
 
     <section className="overview">
       <article className="panel anomalies">
@@ -169,16 +242,17 @@ function App() {
         <div className="issues">{tabIncidents.length ? tabIncidents.map(issue => <button className={`issue ${selected?.id === issue.id ? 'selected' : ''}`} key={issue.id} onClick={() => setSelected(issue)}>
           <div><span className={`badge ${issue.level.toLowerCase()}`}>{issue.level}</span><span className="issue-id">{issue.id}</span></div>
           <strong>{issue.title}</strong><small>{issue.time} · {issue.volume}</small>
-        </button>) : <p>{loadError || `No ${activeIncidentTab} incidents detected today.`}</p>}</div>
+        </button>) : <p>{loadError || `No ${activeIncidentTab} incidents found.`}</p>}</div>
       </aside>
 
       <article className="detail panel">{selected ? <>
         <div className="detail-top"><div><p className="eyebrow">INCIDENT {selected.id}</p><h2>{selected.title}</h2></div><button className="quiet incident-read-action" onClick={setIncidentReadStatus}>{selected.isRead ? 'Mark as unread' : 'Mark as read'}</button></div>
-        <div className="meta"><span className="badge urgent">{selected.level}</span><span>{selected.time}</span><span>Last seen just now</span></div>
+        <div className="meta"><span className={`badge ${selected.severity}`}>{selected.level}</span><span className="status">{selected.status}</span><span>Detected {formatDateTime(selected.createdAt)}</span><span>Last seen {formatDateTime(detail?.lastSeenAt ?? selected.lastSeenAt)}</span></div>
         <div className="divider" />
-        <div className="facts"><div><span>Estimated impact</span><strong>{estimatedImpact == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{detail?.approvalRateDrop == null ? '—' : `${detail.approvalRateDrop}%`}</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions == null ? '—' : affectedTransactions.toLocaleString()}</strong></div></div>
+        <div className="facts"><div><span>Estimated impact</span><strong>{formatImpact(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{formatApprovalRateDrop(detail?.approvalRateDrop ?? selected.approvalRateDrop)}</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions == null ? '—' : affectedTransactions.toLocaleString()}</strong></div></div>
+        <section className="scope"><p className="eyebrow">AFFECTED SCOPE</p><div className="scope-values">{incidentScope.length ? incidentScope.map(([key, value]) => <span key={key}><b>{scopeLabels[key] ?? key}</b>{value}</span>) : <span>No scope returned by the API.</span>}</div></section>
         <section className="next overview-card"><p className="eyebrow">OVERVIEW</p><h3>{overview}</h3><p>Incident data and its operational state are loaded from the Control Tower API.</p></section>
-        <section className="insight actions-taken"><p className="eyebrow">AGENT ACTIONS TAKEN</p><h3>{action || 'No agent actions recorded yet.'}</h3><p>{action ? 'The action has been recorded and the incident remains under active observation.' : 'The API has not returned an action for this incident.'}</p></section>
+        <section className="insight actions-taken"><p className="eyebrow">RELATED CONTEXT</p><h3>{action || 'No agent action recorded.'}</h3><p>{(detail?.relatedIncidentIds ?? selected.relatedIncidentIds ?? []).length ? `Related incidents: ${(detail?.relatedIncidentIds ?? selected.relatedIncidentIds).join(', ')}.` : 'No related incidents recorded.'} {(detail?.relatedDeploymentIds ?? selected.relatedDeploymentIds ?? []).length ? `Related deployments: ${(detail?.relatedDeploymentIds ?? selected.relatedDeploymentIds).join(', ')}.` : 'No related deployments recorded.'}</p></section>
       </> : <div className="detail-top"><div><p className="eyebrow">API STATUS</p><h2>{loadError ? 'Unable to load incidents' : 'Loading incidents…'}</h2><p>{loadError || 'Waiting for the Control Tower API response.'}</p></div></div>}</article>
     </section>
   </main>

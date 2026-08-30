@@ -8,6 +8,7 @@ venv/
 services/agent_api/.env
 .agents
 data/local/
+scripts/ingestion/generator/*.csv
 apps/dashboard/node_modules/
 apps/dashboard/dist/
 skills-lock.json

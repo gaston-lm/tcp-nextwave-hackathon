@@ -79,3 +79,77 @@ header { justify-content: initial; }
   border-color: #b70f70;
   color: #fff;
 }
+
+.transaction-trend-panel {
+  margin-bottom: 18px;
+  padding: 25px;
+  overflow: hidden;
+}
+
+.transaction-chart-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 20px 0 2px;
+  color: #62626e;
+  font-size: 12px;
+}
+
+.transaction-chart-meta span { display: inline-flex; align-items: center; gap: 7px; }
+.failure-key { display: inline-block; width: 21px; height: 3px; border-radius: 3px; background: #dc3151; }
+.total-key { display: inline-block; width: 21px; height: 3px; border-radius: 3px; background: #00aeb6; }
+.thousands-note { color: #858590; font-style: italic; }
+.transaction-chart-scroll { overflow-x: auto; }
+.transaction-chart { display: block; min-width: 680px; width: 100%; height: 244px; overflow: visible; }
+.chart-grid { stroke: #ececf0; stroke-width: 1; }
+.failure-segment { stroke: #dc3151; stroke-width: 4; stroke-linecap: round; }
+.failure-dot { fill: #fff0f1; stroke: #dc3151; stroke-width: 3; }
+.total-segment { stroke: #00aeb6; stroke-width: 4; stroke-linecap: round; }
+.total-dot { fill: #e8fbfb; stroke: #00aeb6; stroke-width: 3; }
+.total-value { fill: #00868c; }
+.chart-value { fill: #565661; font-size: 12px; font-weight: 700; text-anchor: middle; }
+.chart-label { fill: #858590; font-size: 11px; font-weight: 700; text-anchor: middle; }
+.chart-axis-label { fill: #a1a1ab; font-size: 10px; text-anchor: end; }
+.trend-empty { color: #777783; margin: 38px 0; }
+
+.status {
+  border-radius: 999px;
+  background: #e8fbfb;
+  color: #00868c;
+  font-weight: 700;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+
+.scope {
+  margin: 0 0 24px;
+}
+
+.scope-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scope-values span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e5e5ea;
+  border-radius: 999px;
+  color: #555561;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.scope-values b {
+  color: #777783;
+  font-size: 10px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 520px) {
+  .transaction-trend-panel { padding: 20px; }
+  .transaction-trend-panel .panel-heading { align-items: flex-start; gap: 12px; flex-direction: column; }
+}
