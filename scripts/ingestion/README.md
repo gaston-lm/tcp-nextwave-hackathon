@@ -47,7 +47,8 @@ python scripts/ingestion/load_history.py data/fixtures/transactions.example.csv 
 The current live feed is generated directly by the Generator UI; it does not require a
 CSV. Start the database, run `make ingestion-generator`, and use **Start live ingestion** at
 `http://127.0.0.1:8002`. Each real second inserts one second of transaction timestamps,
-while preserving the configured average transaction rate per minute.
+while preserving the configured average transaction rate over time. Minute-level volume varies so
+the live dashboard reflects natural activity changes.
 
 ## Legacy CSV replay
 

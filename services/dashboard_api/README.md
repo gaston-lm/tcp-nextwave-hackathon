@@ -17,6 +17,12 @@ make dashboard-api
 
 Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
+## Browser access
+
+The API permits the local Vite dashboard and Control Tower's Vercel production
+domain, including Vercel's unique production deployment URLs. This lets the
+deployed dashboard call a temporary public API tunnel during the demo.
+
 ## Endpoints
 
 - `GET /health`
@@ -26,7 +32,7 @@ Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 - `PATCH /api/incidents/{incident_id}/read` — persist an incident's read state with `{ "is_read": true | false }`
 - `GET /api/dashboard/incidents-today` — incidents created today and their severity breakdown
 - `GET /api/dashboard/incidents-this-week` — week-to-date incidents grouped by database creation date
-- `GET /api/dashboard/transaction-trend` — transaction and failure counts for the latest 12 hours
+- `GET /api/dashboard/transaction-trend` — per-minute transaction and failure counts for the latest 15 minutes
 
 ## Dashboard data
 

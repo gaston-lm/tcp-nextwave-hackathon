@@ -14,6 +14,10 @@ npm run dev
 
 Open the local URL printed by Vite (normally `http://localhost:5173`).
 
+The dashboard refreshes incident lists, incident summary metrics, and the
+transaction trend every five seconds, so agent-created incidents appear without
+a browser refresh.
+
 ## Production build
 
 ```bash

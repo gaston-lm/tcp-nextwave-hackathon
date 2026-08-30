@@ -17,6 +17,7 @@ app.add_middleware(
         "https://frontend-eta-one-42.vercel.app",
         "https://frontend-bfizk72dq-tcp10.vercel.app",
     ],
+    allow_origin_regex=r"https://control-tower-[a-z0-9]+-tcp10\.vercel\.app",
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
@@ -150,35 +151,35 @@ def incidents_this_week():
 
 @app.get("/api/dashboard/transaction-trend")
 def transaction_trend():
-    """Return total and failed transaction counts for the latest 12 simulated hours."""
+    """Return total and failed transaction counts for the latest 15 simulated minutes."""
     with cursor() as db_cursor:
         db_cursor.execute("""
             WITH anchor AS (
-                SELECT COALESCE(date_trunc('hour', MAX(issued_timestamp)), date_trunc('hour', CURRENT_TIMESTAMP)) AS hour
+                SELECT COALESCE(date_trunc('minute', MAX(issued_timestamp)), date_trunc('minute', CURRENT_TIMESTAMP)) AS minute
                 FROM transactions
-            ), hours AS (
+            ), minutes AS (
                 SELECT generate_series(
-                    anchor.hour - INTERVAL '11 hours', anchor.hour, INTERVAL '1 hour'
-                ) AS hour
+                    anchor.minute - INTERVAL '14 minutes', anchor.minute, INTERVAL '1 minute'
+                ) AS minute
                 FROM anchor
             )
             SELECT
-                hours.hour,
+                minutes.minute,
                 COUNT(transactions.transaction_id) AS attempts,
                 COUNT(transactions.transaction_id) FILTER (WHERE transactions.is_declined IS TRUE) AS failed
-            FROM hours
+            FROM minutes
             LEFT JOIN transactions
-              ON transactions.issued_timestamp >= hours.hour
-             AND transactions.issued_timestamp < hours.hour + INTERVAL '1 hour'
-            GROUP BY hours.hour
-            ORDER BY hours.hour
+              ON transactions.issued_timestamp >= minutes.minute
+             AND transactions.issued_timestamp < minutes.minute + INTERVAL '1 minute'
+            GROUP BY minutes.minute
+            ORDER BY minutes.minute
         """)
         days = []
-        for hour, attempts, failed in db_cursor.fetchall():
+        for minute, attempts, failed in db_cursor.fetchall():
             days.append(
                 {
-                    "date": hour.isoformat(),
-                    "label": hour.strftime("%H:%M"),
+                    "date": minute.isoformat(),
+                    "label": minute.strftime("%H:%M"),
                     "attempts": attempts,
                     "failed": failed,
                 }

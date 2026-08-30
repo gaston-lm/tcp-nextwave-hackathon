@@ -52,10 +52,11 @@ With PostgreSQL running and configured in `data/.env`, the same UI controls inge
 into the database. Choose the **average transactions per minute** and press **Start live ingestion**.
 The server starts one second after the latest persisted `issued_timestamp`, or at the current second
 when the database is empty. Each real second inserts a batch for one second of timestamps while
-preserving the configured transaction average across the minute. This lets a restarted stream
-continue the existing timeline without overlaps. Each hour receives its own normal volume profile
-with a 35% standard deviation, and each second varies by 15% around that profile. The rates and
-rules visible at startup are frozen for that run. **Stop** stops the stream after the current batch.
+preserving the configured transaction average over time. This lets a restarted stream continue the
+existing timeline without overlaps. Each hour receives its own normal volume profile with a 35%
+standard deviation; each minute then varies by 20% around that hourly profile, and each second by
+15% around the minute profile. The rates and rules visible at startup are frozen for that run.
+**Stop** stops the stream after the current batch.
 
 The **Global failure spike** toggle sets an 85% base decline rate for every provider. **Break
 MercadoPago** does the same for MercadoPago only. **Break BancoEstado in Chile** adds 80 percentage

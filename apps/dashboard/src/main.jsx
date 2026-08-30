@@ -89,7 +89,7 @@ function TransactionTrend({ trend }) {
       <span className="thousands-note">Values in thousands</span>
     </div>
     <div className="transaction-chart-scroll">
-      <svg className="transaction-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Twelve hour transaction and failure counts">
+      <svg className="transaction-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Fifteen minute transaction and failure counts">
         {[0, .5, 1].map(fraction => <g key={fraction}><line className="chart-grid" x1={padding.left} x2={chartWidth - padding.right} y1={y(max * fraction)} y2={y(max * fraction)} /><text className="chart-axis-label" x={padding.left - 9} y={y(max * fraction) + 4}>{formatThousands(max * fraction)}</text></g>)}
         {days.slice(0, -1).map((day, index) => <line key={`total-${day.date}`} className="total-segment" x1={x(index)} y1={y(day.attempts)} x2={x(index + 1)} y2={y(days[index + 1].attempts)} />)}
         {days.slice(0, -1).map((day, index) => <line key={day.date} className="failure-segment" x1={x(index)} y1={y(day.failed)} x2={x(index + 1)} y2={y(days[index + 1].failed)} />)}
@@ -110,7 +110,7 @@ function App() {
   const [activeIncidentTab, setActiveIncidentTab] = useState('unread')
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/incidents`, API_REQUEST_OPTIONS)
+    const loadIncidents = () => fetch(`${API_BASE_URL}/api/incidents`, API_REQUEST_OPTIONS)
       .then(response => response.ok ? response.json() : Promise.reject(response))
       .then(data => {
         const apiIssues = data.map(issue => ({
@@ -121,19 +121,18 @@ function App() {
           volume: `${issue.affectedTransactions.toLocaleString()} affected`,
           ...issue,
         }))
-        if (apiIssues.length) {
-          setIssues(apiIssues)
-          setSelected(apiIssues[0])
-          setLoadError(null)
-        } else {
-          setLoadError('The API returned no incidents.')
-        }
+        setIssues(apiIssues)
+        setSelected(current => apiIssues.find(issue => issue.id === current?.id) || apiIssues[0] || null)
+        setLoadError(null)
       })
       .catch(() => {
         setIssues([])
         setSelected(null)
         setLoadError('Unable to load incidents from the Control Tower API.')
       })
+    loadIncidents()
+    const poll = window.setInterval(loadIncidents, 5000)
+    return () => window.clearInterval(poll)
   }, [])
 
   useEffect(() => {
@@ -147,7 +146,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    Promise.all([
+    const loadIncidentMetrics = () => Promise.all([
       fetch(`${API_BASE_URL}/api/dashboard/incidents-today`, API_REQUEST_OPTIONS)
         .then(response => response.ok ? response.json() : Promise.reject(response)),
       fetch(`${API_BASE_URL}/api/dashboard/incidents-this-week`, API_REQUEST_OPTIONS)
@@ -161,6 +160,9 @@ function App() {
         setTodayMetrics(null)
         setWeeklyMetrics(null)
       })
+    loadIncidentMetrics()
+    const poll = window.setInterval(loadIncidentMetrics, 5000)
+    return () => window.clearInterval(poll)
   }, [])
 
   useEffect(() => {
@@ -239,11 +241,11 @@ function App() {
       <article className="panel dashboard-kpis">
         <p className="eyebrow">GENERAL KPIs</p>
         <div className="dashboard-kpi"><span>Total estimated impact</span><strong>{issues.length ? formatImpact(totalEstimatedImpact) : '—'}</strong></div>
-        <div className="dashboard-kpi"><span>Declined rate</span><strong className="accent">{declinedRate == null ? '—' : `${declinedRate.toFixed(declinedRate < 10 ? 1 : 0)}%`}</strong><small>Last 12 hours</small></div>
+        <div className="dashboard-kpi"><span>Declined rate</span><strong className="accent">{declinedRate == null ? '—' : `${declinedRate.toFixed(declinedRate < 10 ? 1 : 0)}%`}</strong><small>Last 15 minutes</small></div>
         <div className="dashboard-kpi"><span>Total affected transactions</span><strong>{issues.length ? totalAffectedTransactions.toLocaleString() : '—'}</strong></div>
       </article>
       <article className="panel transaction-trend-panel">
-        <div className="panel-heading"><div><p className="eyebrow">LIVE ACTIVITY · LAST 12 HOURS</p><h2>Failed transactions</h2></div></div>
+        <div className="panel-heading"><div><p className="eyebrow">LIVE ACTIVITY · LAST 15 MINUTES</p><h2>Failed transactions</h2></div></div>
         <TransactionTrend trend={transactionTrend} />
       </article>
     </section>

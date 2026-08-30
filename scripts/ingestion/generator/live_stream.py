@@ -31,6 +31,7 @@ from scripts.ingestion.load_history import (  # noqa: E402
 MAX_ROWS_PER_MINUTE = 10_000
 VOLUME_STANDARD_DEVIATION_RATIO = 0.15
 HOURLY_VOLUME_STANDARD_DEVIATION_RATIO = 0.35
+MINUTE_VOLUME_STANDARD_DEVIATION_RATIO = 0.20
 
 
 def validate_rows_per_minute(value: object) -> int:
@@ -93,6 +94,12 @@ def sample_hourly_average(rng: random.Random, average_rows: int) -> int:
     return max(1, round(rng.gauss(average_rows, standard_deviation)))
 
 
+def sample_minute_average(rng: random.Random, average_rows: int) -> int:
+    """Choose a visibly variable volume profile for one simulated minute."""
+    standard_deviation = max(1, average_rows * MINUTE_VOLUME_STANDARD_DEVIATION_RATIO)
+    return max(1, round(rng.gauss(average_rows, standard_deviation)))
+
+
 class LiveStreamController:
     """Owns a stream clock where one real second equals one persisted second."""
 
@@ -149,7 +156,6 @@ class LiveStreamController:
         rates = validate_provider_rates(provider_rates)
         rules = validate_decline_rules(decline_rules, rates)
         start_at = self.next_start_at() if start_at is None else start_at
-        start_at = start_at.replace(second=0, microsecond=0)
 
         with self._lock:
             if self._state["running"]:
@@ -230,7 +236,9 @@ class LiveStreamController:
             batch_number = 0
             volume_rng = random.Random(clock.isoformat())
             sampled_hour = None
+            sampled_minute = None
             hourly_average_rows = rows_per_minute
+            minute_average_rows = rows_per_minute
             while not stop_event.is_set():
                 batch_started = time.monotonic()
                 with self._lock:
@@ -242,7 +250,13 @@ class LiveStreamController:
                     hourly_average_rows = sample_hourly_average(
                         volume_rng, rows_per_minute
                     )
-                batch_rows = sample_rows_per_second(volume_rng, hourly_average_rows)
+                minute = clock.replace(second=0, microsecond=0)
+                if minute != sampled_minute:
+                    sampled_minute = minute
+                    minute_average_rows = sample_minute_average(
+                        volume_rng, hourly_average_rows
+                    )
+                batch_rows = sample_rows_per_second(volume_rng, minute_average_rows)
                 rows = transactions_for_second(
                     clock,
                     batch_rows,
