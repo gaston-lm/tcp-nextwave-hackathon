@@ -22,3 +22,7 @@ CREATE TABLE transactions (
     FOREIGN KEY (merchant_id, provider_id)
         REFERENCES providers_by_merchant (merchant_id, provider_id)
 );
+
+-- Supports dashboard queries anchored on the newest transaction and grouped by hour.
+CREATE INDEX IF NOT EXISTS transactions_issued_timestamp_idx
+    ON transactions (issued_timestamp);

@@ -71,6 +71,30 @@ curl -X POST http://localhost:8001/investigations \
   }'
 ```
 
+## Demo scheduler
+
+`scripts/agent/run_scheduled_investigation.py` runs one investigation using the
+Generator UI's current simulated timestamp as `as_of`. It skips safely while
+live ingestion is stopped and uses a local lock file to prevent overlapping
+investigations.
+
+Run it once from the repository root with:
+
+```sh
+make agent-scheduled-investigation
+```
+
+For the demo, a local cron entry runs it once per real minute. It requires the
+agent API and Generator UI to be running first. Replace `/absolute/path/to/repo`
+with the clone path:
+
+```cron
+* * * * * cd /absolute/path/to/repo && .venv/bin/python scripts/agent/run_scheduled_investigation.py >> /tmp/control-tower-agent-scheduler.log 2>&1
+```
+
+Inspect its output with `tail -f /tmp/control-tower-agent-scheduler.log`. Remove
+the cron entry after the demo to stop scheduled OpenAI calls.
+
 ## Arize AX tracing
 
 The agent, its database tools, and OpenAI calls are traced when all Arize AX
