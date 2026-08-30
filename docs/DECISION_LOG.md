@@ -176,4 +176,4 @@ NextWave Hackathon 2026 · Buenos Aires
 
 **Chosen:** 1 minute of ingested data = 1 second in real-time demonstration
 
-**Why:** If we ran at real speed, nothing would happen for ages during the demo. Speeding it up 60x lets people see the system catch problems in real time. V0 testing worked great with this, and it's actually more impressive than waiting around. 
+**Why:** If we ran at real speed, nothing would happen for ages during the demo. Speeding it up 60x lets people see the system catch problems in real time. V0 testing worked great with this, and it's actually more impressive than waiting around.
