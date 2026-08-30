@@ -6,6 +6,8 @@ TCP's repository for Nextwave Hackathon 2026 by Yuno x Nauta
 
 Challange 2: The Control Tower
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level product architecture.
+
 ## Local development
 
 Database credentials live in `data/.env`; start from `data/.env.example`.
