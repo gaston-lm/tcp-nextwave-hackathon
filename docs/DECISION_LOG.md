@@ -307,3 +307,15 @@ NextWave Hackathon 2026 · Buenos Aires
 **Chosen:** Multiple test cases covering real-world scenarios
 
 **Why:** We built test cases to break our system on purpose. We want to make sure everything works together. We test things like a provider going down everywhere, a spike in fraud in Argentina, and scenarios where past issues or recent code changes might break everything. This way we know what we're working with before we show it to people.
+
+---
+
+## 23. Change of Transaction Window  `T+22:00`
+
+**Options considered**
+
+- Maintain the 5 minutes window or change it into 1 minute.
+
+**Chosen:** Change it into 1 minute
+
+**Why:** After some discussion, we think that the 1 minute window is a lot more realistic and it lets us inject data every 10 seconds.
