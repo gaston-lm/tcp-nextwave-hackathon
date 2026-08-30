@@ -13,6 +13,7 @@ services:
       - ./db_table_definitions/providers_by_merchant.sql:/docker-entrypoint-initdb.d/02-providers_by_merchant.sql:ro
       - ./db_table_definitions/transactions.sql:/docker-entrypoint-initdb.d/03-transactions.sql:ro
       - ./db_table_definitions/incidents.sql:/docker-entrypoint-initdb.d/04-incidents.sql:ro
+      - ./db_table_definitions/baseline_metrics.sql:/docker-entrypoint-initdb.d/05-baseline_metrics.sql:ro
 
 volumes:
   control_tower_postgres_data:
