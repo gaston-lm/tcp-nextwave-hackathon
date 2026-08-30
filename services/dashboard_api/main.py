@@ -96,6 +96,7 @@ def list_incidents():
                        WHERE incidents_actions.incident_id = incidents.incident_id
                    ), '[]'::json), incidents.created_at
             FROM incidents
+            WHERE incidents.status = 'open'
             ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
         """)
         return [serialize_incident(row) for row in db_cursor.fetchall()]
