@@ -12,6 +12,11 @@ Database credentials live in `data/.env`; start from `data/.env.example`.
 Place large, local-only CSV files in `data/local/`, for example
 `data/local/baseline.csv`.
 
+For local development, `data/.env` is the source of truth for database
+credentials. The `make db-init` and `make agent-api` commands deliberately
+discard inherited `DATABASE_URL` and `POSTGRES_*` shell variables, preventing
+stale terminal or direnv credentials from overriding that file.
+
 ```bash
 make db-up
 make db-init HISTORY=data/local/baseline.csv
@@ -35,7 +40,8 @@ make dashboard      # Vite development server
 │   ├── dashboard_api/          # Dashboard FastAPI API (port 8000)
 │   └── agent_api/              # Agent orchestration FastAPI API (port 8001)
 ├── data/
-│   ├── schemas/                # PostgreSQL schema definitions
+│   ├── db_migrations/          # Ordered, versioned database changes
+│   ├── schemas/                # Transaction and baseline schema definitions
 │   ├── seeds/                  # Deterministic SQL seed data
 │   ├── fixtures/               # Small committed example datasets
 │   ├── local/                  # Ignored local CSV datasets
@@ -48,9 +54,27 @@ make dashboard      # Vite development server
 └── requirements-dev.txt        # Shared development tooling
 ```
 
+## Incident workflow
+
+The agent API runs a two-stage incident workflow:
+
+1. `AnomalyDetector` analyzes the latest completed five-minute payment window and returns a
+   strict JSON Schema result.
+2. `IncidentReviewer` compares that result with all open incidents and
+   uses semantic searches over closed-incident memory and payment deployment logs.
+3. A deterministic SQLAlchemy persistence stage—not an agent—creates new incidents and applies
+   complete updates to existing ones in a transaction.
+
+Incident, incident-memory, and deployment-log persistence use SQLAlchemy models. Analytical
+transaction/baseline queries remain parameterized read-only metric queries. The investigation API
+response includes the detector result, reviewer proposals, and the IDs committed by persistence.
+
+All incident schema changes belong in `data/db_migrations/`; `scripts/db/init_db.py` records
+applied migration filenames in `schema_migrations`.
+
 ## Developer checks
 
-Install the shared development tools and activate the hooks once per clone:
+Install the API and shared development dependencies, then activate the hooks once per clone:
 
 ```bash
 pip install -r requirements-dev.txt

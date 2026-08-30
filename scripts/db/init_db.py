@@ -14,6 +14,7 @@ from psycopg2.errors import DuplicateTable
 ROOT = Path(__file__).parents[2]
 DATA_DIR = ROOT / "data"
 SCHEMAS = DATA_DIR / "schemas"
+MIGRATIONS = DATA_DIR / "db_migrations"
 TEST_DASHBOARD_SEED = DATA_DIR / "seeds" / "dashboard_mock.sql"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -44,11 +45,27 @@ def main() -> None:
         "methods_by_provider.sql",
         "providers_by_merchant.sql",
         "transactions.sql",
-        "incidents.sql",
         "baseline_metrics.sql",
     )
     with psycopg2.connect(**connection_config) as connection:
         with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    filename TEXT PRIMARY KEY,
+                    applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            for migration in sorted(MIGRATIONS.glob("*.sql")):
+                cursor.execute(
+                    "SELECT 1 FROM schema_migrations WHERE filename = %s",
+                    (migration.name,),
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute(migration.read_text(encoding="utf-8"))
+                    cursor.execute(
+                        "INSERT INTO schema_migrations (filename) VALUES (%s)",
+                        (migration.name,),
+                    )
             for filename in table_files:
                 cursor.execute("SAVEPOINT apply_definition")
                 try:

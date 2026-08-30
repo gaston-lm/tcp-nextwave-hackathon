@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ingestion.load_history import IngestionError, read_transactions
+from scripts.ingestion.load_history import (
+    IngestionError,
+    assign_transaction_ids,
+    read_transactions,
+)
 from scripts.ingestion.stream_ingest import replay_transactions
 
 
@@ -61,6 +65,21 @@ def test_rejects_extra_value_in_row(tmp_path):
 
     with pytest.raises(IngestionError, match="row 2: too many values"):
         read_transactions(path)
+
+
+def test_assigns_ids_by_timestamp_with_stable_source_order(tmp_path):
+    path = write_csv(
+        tmp_path,
+        HEADER
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,99,2026-01-02T03:04:06,false,0,ARS,100.5,10\n"
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,100,2026-01-02T03:04:05,false,0,ARS,100.5,10\n"
+        + "AR,Pay,1,card,1,Merchant,1,Issuer,Receiver,101,2026-01-02T03:04:06,false,0,ARS,100.5,10\n",
+    )
+
+    assigned = assign_transaction_ids(read_transactions(path), 1_000)
+
+    assert [item.transaction_id for item in assigned] == [1_001, 1_002, 1_003]
+    assert [item.issued_timestamp.second for item in assigned] == [5, 6, 6]
 
 
 def test_replays_transactions_in_configured_batches(monkeypatch, tmp_path):

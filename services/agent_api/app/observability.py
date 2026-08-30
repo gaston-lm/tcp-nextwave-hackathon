@@ -51,6 +51,13 @@ def traced_agent(name: str) -> Callable[[Function], Function]:
     return TRACER.agent(name=name)
 
 
+def traced_chain(name: str) -> Callable[[Function], Function]:
+    """Decorate an orchestration boundary only when Arize AX is configured."""
+    if TRACER is None:
+        return lambda function: function
+    return TRACER.chain(name=name)
+
+
 def traced_tool(name: str, description: str) -> Callable[[Function], Function]:
     """Decorate a local tool execution only when Arize AX is configured."""
     if TRACER is None:

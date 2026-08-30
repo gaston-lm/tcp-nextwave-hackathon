@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: control-tower-postgres
     restart: unless-stopped
     env_file:
@@ -12,7 +12,7 @@ services:
       - ./schemas/methods_by_provider.sql:/docker-entrypoint-initdb.d/01-methods_by_provider.sql:ro
       - ./schemas/providers_by_merchant.sql:/docker-entrypoint-initdb.d/02-providers_by_merchant.sql:ro
       - ./schemas/transactions.sql:/docker-entrypoint-initdb.d/03-transactions.sql:ro
-      - ./schemas/incidents.sql:/docker-entrypoint-initdb.d/04-incidents.sql:ro
+      - ./db_migrations/001_incidents_and_memory.sql:/docker-entrypoint-initdb.d/04-incidents.sql:ro
       - ./schemas/baseline_metrics.sql:/docker-entrypoint-initdb.d/05-baseline_metrics.sql:ro
 
 volumes:

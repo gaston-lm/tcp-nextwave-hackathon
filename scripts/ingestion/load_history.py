@@ -10,7 +10,7 @@ import math
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -187,6 +187,19 @@ def read_transactions(path: Path) -> list[Transaction]:
     return list(iter_transactions(path))
 
 
+def assign_transaction_ids(
+    transactions: Iterable[Transaction], latest_transaction_id: int
+) -> list[Transaction]:
+    """Assign unique IDs in source timestamp order, preserving source timestamps."""
+    ordered = sorted(
+        enumerate(transactions), key=lambda item: (item[1].issued_timestamp, item[0])
+    )
+    return [
+        replace(transaction, transaction_id=latest_transaction_id + position)
+        for position, (_, transaction) in enumerate(ordered, start=1)
+    ]
+
+
 def database_config() -> dict[str, str]:
     required = (
         "POSTGRES_HOST",
@@ -301,6 +314,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Load a historical payment transaction CSV into PostgreSQL."
     )
     parser.add_argument("csv_file", type=Path, help="Path to the history CSV file")
+    parser.add_argument(
+        "--preserve-transaction-ids",
+        action="store_true",
+        help="Insert source transaction IDs instead of assigning new IDs from the table maximum.",
+    )
     args = parser.parse_args(argv)
     started = time.monotonic()
     try:
@@ -319,6 +337,20 @@ def main(argv: list[str] | None = None) -> int:
 
         logging.info("Inserting into PostgreSQL...")
         with psycopg2.connect(**database_config()) as connection:
+            if not args.preserve_transaction_ids:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT COALESCE(MAX(transaction_id), 0) FROM transactions"
+                    )
+                    latest_transaction_id = cursor.fetchone()[0]
+                transactions = assign_transaction_ids(
+                    transactions, latest_transaction_id
+                )
+                logging.info(
+                    "Assigned transaction IDs %d through %d in issued_timestamp order.",
+                    transactions[0].transaction_id,
+                    transactions[-1].transaction_id,
+                )
             inserted = insert_transactions(connection, transactions)
         logging.info("Inserted %d rows successfully.", inserted)
         logging.info("Completed in %.1f seconds.", time.monotonic() - started)

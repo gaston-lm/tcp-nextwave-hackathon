@@ -26,10 +26,20 @@ The importer upserts provider/method mappings before inserting transactions. Boo
 
 ## Load history
 
-Load a finite historical CSV while preserving each source `issued_timestamp`:
+Load a finite historical CSV while preserving each source `issued_timestamp`. By default, the
+loader reads the table's current maximum `transaction_id`, sorts CSV rows by `issued_timestamp`
+(retaining CSV order for equal timestamps), and assigns consecutive IDs. This makes scenario
+files with reused source IDs safe to load one after another.
 
 ```bash
 python scripts/ingestion/load_history.py data/fixtures/transactions.example.csv
+```
+
+Use `--preserve-transaction-ids` only when source IDs are already globally unique:
+
+```bash
+python scripts/ingestion/load_history.py data/fixtures/transactions.example.csv \
+  --preserve-transaction-ids
 ```
 
 ## Simulated live stream

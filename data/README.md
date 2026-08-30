@@ -4,7 +4,9 @@ This directory is the single owner of the shared PostgreSQL schema and local Doc
 
 ## Contents
 
-- `schemas/` — schema and baseline-metric SQL.
+- `schemas/` — transaction mappings and baseline-metric SQL.
+- `db_migrations/` — ordered, versioned database migrations; apply a new file for every
+  incident-schema change.
 - `seeds/` — deterministic SQL seed data applied by initialization.
 - `fixtures/` — small committed example datasets.
 - `local/` — ignored large local CSV datasets, such as historical and live transaction files.
@@ -35,7 +37,8 @@ weekday baseline grains:
 python scripts/db/init_db.py --history-csv data/local/baseline.csv
 ```
 
-The script applies the schema, inserts the CSV's mapping and transaction rows, then calls
+The script records and applies outstanding migrations, applies the remaining schema files,
+inserts the CSV's mapping and transaction rows, then calls
 `refresh_baseline_metrics`. Baselines are calculated only after history is present, so they
 never include an empty database or predate the history load.
 

@@ -1,8 +1,9 @@
+import json
 from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .database import connect
 
@@ -29,12 +30,10 @@ def cursor():
 
 
 class IncidentCreate(BaseModel):
-    incident_key: str = Field(pattern=r"^[A-Z]+-\d+$")
     title: str
     severity: str
     overview: str
-    country: str | None = None
-    provider_name: str | None = None
+    dimension_signatures: dict[str, str | None]
     estimated_impact: float | None = None
 
 
@@ -43,22 +42,24 @@ class IncidentReadUpdate(BaseModel):
 
 
 def serialize_incident(row):
+    signature = row[5] if isinstance(row[5], dict) else json.loads(row[5])
     return {
         "key": row[0],
         "title": row[1],
         "severity": row[2],
         "status": row[3],
-        "country": row[4],
-        "provider": row[5],
-        "overview": row[6],
-        "estimatedImpact": row[7],
-        "approvalRateDrop": row[8],
-        "affectedTransactions": row[9],
-        "agentAction": row[10],
-        "agentActionAt": row[11],
-        "startedAt": row[12],
-        "lastSeenAt": row[13],
-        "isRead": row[14],
+        "country": signature.get("country"),
+        "provider": signature.get("provider"),
+        "dimensionSignatures": signature,
+        "overview": row[4],
+        "estimatedImpact": row[6],
+        "approvalRateDrop": row[7],
+        "affectedTransactions": row[8],
+        "agentAction": None,
+        "agentActionAt": None,
+        "startedAt": row[9],
+        "lastSeenAt": row[10],
+        "isRead": row[11],
     }
 
 
@@ -73,9 +74,8 @@ def health():
 def list_incidents():
     with cursor() as db_cursor:
         db_cursor.execute("""
-            SELECT incident_key, title, severity, status, country, provider_name, overview,
-                   estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                   started_at, last_seen_at, is_read
+            SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
+                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
             FROM incidents ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, last_seen_at DESC
         """)
         return [serialize_incident(row) for row in db_cursor.fetchall()]
@@ -85,11 +85,11 @@ def list_incidents():
 def incidents_today():
     with cursor() as db_cursor:
         db_cursor.execute("""
-            SELECT incident_key, severity
+            SELECT incident_id, severity
             FROM incidents
             WHERE started_at >= date_trunc('day', CURRENT_TIMESTAMP)
               AND started_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
-            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, incident_key
+            ORDER BY CASE severity WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, incident_id
         """)
         by_incident_key = [
             {"incidentKey": incident_key, "severity": severity, "count": 1}
@@ -109,7 +109,7 @@ def incidents_this_week():
                     INTERVAL '1 day'
                 )::date AS day
             )
-            SELECT days.day, COUNT(incidents.id)
+            SELECT days.day, COUNT(incidents.incident_id)
             FROM days
             LEFT JOIN incidents
               ON incidents.started_at >= days.day
@@ -124,17 +124,16 @@ def incidents_this_week():
     return {"total": sum(item["count"] for item in days), "days": days}
 
 
-@app.get("/api/incidents/{incident_key}")
-def get_incident(incident_key: str):
+@app.get("/api/incidents/{incident_id}")
+def get_incident(incident_id: int):
     with cursor() as db_cursor:
         db_cursor.execute(
             """
-            SELECT incident_key, title, severity, status, country, provider_name, overview,
-                   estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                   started_at, last_seen_at, is_read
-            FROM incidents WHERE incident_key = %s
+            SELECT incident_id, title, severity, status, overview, dimension_signatures::text,
+                   estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
+            FROM incidents WHERE incident_id = %s
         """,
-            (incident_key,),
+            (incident_id,),
         )
         incident = db_cursor.fetchone()
         if incident is None:
@@ -142,17 +141,19 @@ def get_incident(incident_key: str):
         return serialize_incident(incident)
 
 
-@app.patch("/api/incidents/{incident_key}/read")
-def update_incident_read_status(incident_key: str, update: IncidentReadUpdate):
+@app.patch("/api/incidents/{incident_id}/read")
+def update_incident_read_status(incident_id: int, update: IncidentReadUpdate):
     with cursor() as db_cursor:
-        db_cursor.execute("""
+        db_cursor.execute(
+            """
             UPDATE incidents
             SET is_read = %s
-            WHERE incident_key = %s
-            RETURNING incident_key, title, severity, status, country, provider_name, overview,
-                      estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                      started_at, last_seen_at, is_read
-        """, (update.is_read, incident_key))
+            WHERE incident_id = %s
+            RETURNING incident_id, title, severity, status, overview, dimension_signatures::text,
+                      estimated_impact, approval_rate_drop, affected_transaction_count, started_at, last_seen_at, is_read
+        """,
+            (update.is_read, incident_id),
+        )
         incident = db_cursor.fetchone()
         if incident is None:
             raise HTTPException(status_code=404, detail="Incident not found")
@@ -164,17 +165,15 @@ def create_incident(incident: IncidentCreate):
     with cursor() as db_cursor:
         db_cursor.execute(
             """
-            INSERT INTO incidents (incident_key, title, severity, overview, country, provider_name, estimated_impact)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING incident_key
+            INSERT INTO incidents (title, severity, overview, dimension_signatures, estimated_impact)
+            VALUES (%s, %s, %s, %s::jsonb, %s)
+            RETURNING incident_id
         """,
             (
-                incident.incident_key,
                 incident.title,
                 incident.severity,
                 incident.overview,
-                incident.country,
-                incident.provider_name,
+                json.dumps(incident.dimension_signatures),
                 incident.estimated_impact,
             ),
         )
