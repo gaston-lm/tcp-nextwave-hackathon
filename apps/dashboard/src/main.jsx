@@ -40,12 +40,22 @@ function formatDateTime(value) {
 function formatApprovalRateDrop(value) {
   if (value == null) return '—'
   const percent = Math.abs(value) <= 1 ? value * 100 : value
-  return `${percent.toFixed(percent < 10 ? 1 : 0)}%`
+  const absolutePercent = Math.abs(percent)
+  return `-${absolutePercent.toFixed(absolutePercent < 10 ? 1 : 0)}%`
 }
 
 function formatImpact(value) {
   if (value == null) return '—'
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)
+  return `USD ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)}`
+}
+
+function formatActionType(actionType) {
+  const actionTitles = {
+    post_slack_alert_to_channel: "Slack Alert to Merchan's Channel",
+    recommend_switch_provider_to_merchant: 'Suggestion merchant to switch provider',
+    deploy_rollback: 'Rollback should be done',
+  }
+  return actionTitles[actionType] || 'Action taken'
 }
 
 function incidentRingGradient(incidents, total) {
@@ -165,7 +175,10 @@ function App() {
       .catch(() => setDetail(null))
   }, [selected?.id])
 
-  const action = detail?.agentAction
+  const actions = detail?.actions ?? selected?.actions ?? (detail?.agentAction ? [{
+    actionType: detail.agentActionType,
+    actionDetails: detail.agentAction,
+  }] : [])
   const overview = detail?.overview || selected?.overview || 'No overview returned by the API.'
   const estimatedImpact = detail?.estimatedImpact ?? selected?.estimatedImpact
   const affectedTransactions = detail?.affectedTransactions ?? selected?.affectedTransactions
@@ -176,6 +189,13 @@ function App() {
   const tabIncidents = activeIncidentTab === 'unread' ? unreadIncidents : readIncidents
   const todayIncidentKeys = todayMetrics?.byIncidentKey || []
   const ringGradient = incidentRingGradient(todayIncidentKeys, todayMetrics?.total || 0)
+  const totalEstimatedImpact = issues.reduce((total, incident) => total + (incident.estimatedImpact || 0), 0)
+  const totalAffectedTransactions = issues.reduce((total, incident) => total + (incident.affectedTransactions || 0), 0)
+  const trendTotals = (transactionTrend?.days || []).reduce(
+    (totals, day) => ({ attempts: totals.attempts + day.attempts, failed: totals.failed + day.failed }),
+    { attempts: 0, failed: 0 },
+  )
+  const declinedRate = trendTotals.attempts ? (trendTotals.failed / trendTotals.attempts) * 100 : null
   const incidentScope = Object.entries(detail?.dimensionSignatures ?? selected?.dimensionSignatures ?? {})
     .filter(([, value]) => value)
 
@@ -215,9 +235,17 @@ function App() {
       </div>
     </header>
 
-    <section className="panel transaction-trend-panel">
-      <div className="panel-heading"><div><p className="eyebrow">LIVE ACTIVITY · LAST 12 HOURS</p><h2>Failed transactions</h2></div></div>
-      <TransactionTrend trend={transactionTrend} />
+    <section className="dashboard-summary">
+      <article className="panel dashboard-kpis">
+        <p className="eyebrow">GENERAL KPIs</p>
+        <div className="dashboard-kpi"><span>Total estimated impact</span><strong>{issues.length ? formatImpact(totalEstimatedImpact) : '—'}</strong></div>
+        <div className="dashboard-kpi"><span>Declined rate</span><strong className="accent">{declinedRate == null ? '—' : `${declinedRate.toFixed(declinedRate < 10 ? 1 : 0)}%`}</strong><small>Last 12 hours</small></div>
+        <div className="dashboard-kpi"><span>Total affected transactions</span><strong>{issues.length ? totalAffectedTransactions.toLocaleString() : '—'}</strong></div>
+      </article>
+      <article className="panel transaction-trend-panel">
+        <div className="panel-heading"><div><p className="eyebrow">LIVE ACTIVITY · LAST 12 HOURS</p><h2>Failed transactions</h2></div></div>
+        <TransactionTrend trend={transactionTrend} />
+      </article>
     </section>
 
     <section className="overview">
@@ -251,8 +279,8 @@ function App() {
         <div className="divider" />
         <div className="facts"><div><span>Estimated impact</span><strong>{formatImpact(estimatedImpact)}</strong></div><div><span>Approval rate dropped</span><strong className="accent">{formatApprovalRateDrop(detail?.approvalRateDrop ?? selected.approvalRateDrop)}</strong></div><div><span>Affected transactions</span><strong>{affectedTransactions == null ? '—' : affectedTransactions.toLocaleString()}</strong></div></div>
         <section className="scope"><p className="eyebrow">AFFECTED SCOPE</p><div className="scope-values">{incidentScope.length ? incidentScope.map(([key, value]) => <span key={key}><b>{scopeLabels[key] ?? key}</b>{value}</span>) : <span>No scope returned by the API.</span>}</div></section>
-        <section className="next overview-card"><p className="eyebrow">OVERVIEW</p><h3>{overview}</h3><p>Incident data and its operational state are loaded from the Control Tower API.</p></section>
-        <section className="insight actions-taken"><p className="eyebrow">RELATED CONTEXT</p><h3>{action || 'No agent action recorded.'}</h3><p>{(detail?.relatedIncidentIds ?? selected.relatedIncidentIds ?? []).length ? `Related incidents: ${(detail?.relatedIncidentIds ?? selected.relatedIncidentIds).join(', ')}.` : 'No related incidents recorded.'} {(detail?.relatedDeploymentIds ?? selected.relatedDeploymentIds ?? []).length ? `Related deployments: ${(detail?.relatedDeploymentIds ?? selected.relatedDeploymentIds).join(', ')}.` : 'No related deployments recorded.'}</p></section>
+        <section className="next overview-card"><p className="eyebrow">OVERVIEW</p><h3>{overview}</h3></section>
+        <section className="insight actions-taken"><p className="eyebrow">ACTIONS TAKEN</p>{actions.length ? <ul className="action-list">{actions.map((item, index) => <li key={`${item.actionType ?? item.action_type}-${item.createdAt ?? item.created_at ?? index}`}><strong>{formatActionType(item.actionType ?? item.action_type)}</strong><p>{item.actionDetails ?? item.action_details}</p></li>)}</ul> : <p>No agent action recorded.</p>}</section>
       </> : <div className="detail-top"><div><p className="eyebrow">API STATUS</p><h2>{loadError ? 'Unable to load incidents' : 'Loading incidents…'}</h2><p>{loadError || 'Waiting for the Control Tower API response.'}</p></div></div>}</article>
     </section>
   </main>
