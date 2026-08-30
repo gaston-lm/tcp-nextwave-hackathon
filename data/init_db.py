@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).parents[1]
 DEFINITIONS = Path(__file__).parent / "db_table_definitions"
+TEST_DASHBOARD_SEED = Path(__file__).parent / "test_mock_dashboard.sql"
 
 
 def main() -> None:
@@ -36,22 +37,7 @@ def main() -> None:
                     cursor.execute((DEFINITIONS / filename).read_text(encoding="utf-8"))
                 except DuplicateTable:
                     cursor.execute("ROLLBACK TO SAVEPOINT apply_definition")
-            cursor.execute("""
-                INSERT INTO incidents (
-                    incident_key, title, severity, status, country, provider_name, overview,
-                    estimated_impact, approval_rate_drop, affected_transaction_count, agent_action, agent_action_at,
-                    started_at, last_seen_at
-                ) VALUES (
-                    'URG-3159', 'Mercado Pago declines transfers from AR', 'urgent', 'monitoring',
-                    'Argentina', 'Mercado Pago',
-                    'Authorization declines are 4.6× above the expected baseline for Argentine bank transfers.',
-                    5120000, 18.7, 1284,
-                    'Rerouted eligible Argentine transfers to the secondary provider and notified merchant operations.',
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP - INTERVAL '45 minutes', CURRENT_TIMESTAMP
-                ) ON CONFLICT (incident_key) DO UPDATE
-                SET approval_rate_drop = EXCLUDED.approval_rate_drop
-                RETURNING incident_key
-            """)
+            cursor.execute(TEST_DASHBOARD_SEED.read_text(encoding="utf-8"))
     print("Database schema and local dashboard seed are ready.")
 
 
