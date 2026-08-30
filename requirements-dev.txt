@@ -1,2 +1,6 @@
+-r services/dashboard_api/requirements.txt
+-r services/agent_api/requirements.txt
+
 pre-commit==4.6.2
+pytest==8.4.2
 ruff==0.16.5

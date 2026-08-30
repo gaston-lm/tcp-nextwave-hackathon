@@ -21,7 +21,7 @@ Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
 - `GET /health`
 - `GET /api/incidents`
-- `GET /api/incidents/{incident_key}`
+- `GET /api/incidents/{incident_id}`
 - `POST /api/incidents`
 - `PATCH /api/incidents/{incident_key}/read` — persist an incident's read state with `{ "is_read": true | false }`
 - `GET /api/dashboard/incidents-today` — current-day incident total and the per-`incident_key` chart breakdown

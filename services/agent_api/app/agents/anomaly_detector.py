@@ -8,9 +8,10 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from ..metrics import MetricsService
-from ..models import PaymentAnomalyDetectionResult
+from ..models import AnomalyInvestigation, PaymentAnomalyDetectionResult
 from ..observability import traced_agent
 from ..settings import Settings, get_settings
+from ..structured_output import parse_output, response_format
 from .prompts import PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS
 from .tools import PAYMENT_ANOMALY_DETECTION_TOOLS
 
@@ -55,6 +56,7 @@ class AnomalyDetector:
             instructions=PAYMENT_ANOMALY_DETECTION_INSTRUCTIONS,
             input="Investigate the latest completed five-minute window. Begin with the overview.",
             tools=PAYMENT_ANOMALY_DETECTION_TOOLS,
+            text=response_format("anomaly_investigation", AnomalyInvestigation),
             # The first observation is mandatory and deterministic. Subsequent
             # calls remain ReAct decisions made from the returned evidence.
             tool_choice={"type": "function", "name": "get_current_window_overview"},
@@ -68,7 +70,7 @@ class AnomalyDetector:
             calls = [item for item in response.output if item.type == "function_call"]
             if not calls:
                 return PaymentAnomalyDetectionResult(
-                    result=response.output_text,
+                    result=parse_output(AnomalyInvestigation, response.output_text),
                     steps_used=step - 1,
                 )
             outputs = []
@@ -92,17 +94,20 @@ class AnomalyDetector:
                 previous_response_id=response.id,
                 input=outputs,
                 tools=PAYMENT_ANOMALY_DETECTION_TOOLS,
+                text=response_format("anomaly_investigation", AnomalyInvestigation),
                 tool_choice="auto",
                 parallel_tool_calls=False,
                 reasoning={"effort": "low"},
                 store=True,
             )
-        return PaymentAnomalyDetectionResult(
-            result=json.dumps(
-                {
-                    "investigation_status": "incomplete",
+        return PaymentAnomalyDetectionResult.model_validate(
+            {
+                "result": {
+                    "investigation_status": "insufficient_evidence",
+                    "clusters": [],
+                    "unexplained_excess_declines_percent": 0,
                     "summary": "Investigation reached its tool-call limit.",
-                }
-            ),
-            steps_used=max_steps,
+                },
+                "steps_used": max_steps,
+            }
         )
