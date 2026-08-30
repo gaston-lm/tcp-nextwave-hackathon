@@ -56,7 +56,11 @@ async def investigate(
             action_persistence,
         ) = await TowerControlAgent(
             metrics, request.app.state.session_factory
-        ).investigate(payload.max_steps)
+        ).investigate(
+            metrics.observation_window_start,
+            metrics.observation_window_end,
+            payload.max_steps,
+        )
     except OpenAIError as error:
         raise HTTPException(
             status_code=502, detail=f"OpenAI investigation failed: {error}"
